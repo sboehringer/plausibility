@@ -14,7 +14,7 @@ packageDefinition = list(
 		depends = c(),
 		suggests = c(),
 		license = 'LGPL',
-		news = "0.1-0   Initial release"
+		news = "0.2-0	Implementation Plausibility region\n0.1-0   Initial release"
 	),
 	git = list(
 		readme = '## Installation\n```{r}\nlibrary(devtools);\ninstall_github("sboehringer/plausibility")\n```\n',
