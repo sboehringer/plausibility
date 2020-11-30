@@ -108,13 +108,15 @@ tempFileName = function(prefix, extension = NULL, digits = 6, retries = 5, inRtm
 	Log(sprintf('Tempfilename:%s', path), 5);
 	path
 }
-dirList = function(dir, regex = TRUE, case = TRUE) {
+dirList = function(dir, regex = TRUE, case = TRUE, path = FALSE, absolute = FALSE) {
 	base = splitPath(dir)$dir;
 	files = list.files(base);
 	if (regex) {
 		re = splitPath(dir)$file;
 		files = files[grep(re, files, perl = TRUE, ignore.case = !case)];
 	}
+	prefix = if (absolute) splitPath(base)$absolute else base;
+	if (absolute || path) files = paste(prefix, files, sep = '/');
 	files
 }
 list_files_with_exts = function(path, exts, full.names = TRUE)
@@ -899,6 +901,8 @@ relativePathSingle = function(from, to) {
 }
 relativePath = Vectorize(relativePathSingle, c('from', 'to'));
 SplitPath = function(path, ...)lapply(path, splitPath, ...);
+absolutePathSingle = function(path)splitPath(path)$absolute
+absolutePath = Vectorize(absolutePathSingle, c('path'));
 
 # 	createZip(list(results = c('r/ref1.html', 'r/ref2.html')), 'r/myZip.zip', doCopy = TRUE);
 
@@ -911,7 +915,8 @@ createZip = function(input, output, pword, doCopy = FALSE, readmeText, readme, l
 		Dir.create(subdir);
 		to = paste(subdir, list.kpu(SplitPath(e), 'file'), sep = '/');
 		if (doCopy) file.copy(e, to) else {
-			from = relativePath(subdir, e);
+			#from = relativePath(subdir, e);
+			from = absolutePath(e);
 			if (absoluteSymlink) from = NormalizePath(paste(splitPath(subdir)$absolute, from, sep = '/'));
 			print(list(from = from, to = to));
 			file.symlink(from, to);

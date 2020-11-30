@@ -173,6 +173,7 @@ searchContourGridRaw = function(f, grid, v, ...,
 		coords = sapply(1:ncol(NdsCube), function(i)pts[NdsCube[, i], i]);
 		idcs = DfSearch(Df_(coords), Df_(grid));
 		vs = v[idcs];
+		#if (is.na(any(vs <= contour) & any(vs >= contour))) browser();
 		if (any(vs <= contour) & any(vs >= contour)) { # tb persued
 			mn = apply(coords, 2, min);
 			mx = apply(coords, 2, max);
@@ -222,7 +223,6 @@ searchContourGridList = function(f, gridList, ..., contour = 0.05, gridGen, eps 
 	gL = lapply(gridList, searchContourGrid, ..., f = f, contour = contour, gridGen = gridGen);
 	return(unlist.n(gL, 1));
 }
-
 
 searchContour = function(f, start, ..., contour = 0.05, delta = 3,
 	gridGen = gridBounding(Ngrid = 3), eps = 1e-2, lower = TRUE) {

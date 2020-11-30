@@ -2482,6 +2482,25 @@ dfNmsStd = function(f, nmsStd, d) {
 # }
 DfNames2std = function(d, nmsFormula, nmsStandard)dfNmsStd(nmsFormula, nmsStandard, d)
 
+charRange = characterRange = function(ns, range, indeces = TRUE, invert = FALSE) {
+	N = length(ns);
+	r = if (class(range) == 'character') {
+		(if (is.na(range)[1])1 else which(range[1] == ns)) :
+			(if (is.na(range)[2])N else which(range[2] == ns))
+	} else if (class(range) == 'integer') {
+		(if (is.na(range)[1])1 else range[1]) :
+			(if (is.na(range)[2])N else range[2])
+	} else c();
+	if (invert) r = setdiff(1:length(ns), r);
+	if (!indeces) r = ns[r];
+	return(r);
+}
+
+DfCol = function(d, range) {
+	d = d[, characterRange(names(d), range), drop = F];
+	return(d);
+}
+
 List_ = .List = function(l, min_ = NULL, sel_ = NULL,
 	rm.null = FALSE, names_ = NULL, null2na = FALSE, simplify_ = FALSE, rm.na = FALSE) {
 	if (!is.null(min_)) {
@@ -3510,7 +3529,20 @@ Reshape.long = function(d, vars, factorColumn = 'repeat', valuePostfix = '_long'
 		factorColumn = factorColumn, valuePostfix = valuePostfix, varsLong = varsLong);
 }
 
+# reshape rows in blocks to avoid memory exhaustion
+Reshape.long.byParts = function(d, ..., N = 1e4, path = tempfile()) {
+	Nrow = nrow(d);
+	Nparts = ceiling(Nrow / N);
 
+	#Nparts = 2;
+	for (i in 1:Nparts) {
+		dP = d[ (N*(i - 1) + 1):min((N*i), Nrow), ];
+		dL = Reshape.long(dP, ...);
+		write.table(dL, file = path, col.names = i == 1, append = i != 1, row.names = F);
+	}
+	gc();
+	return(readTable(Sprintf('[SEP=S,HEADER=T]:%{path}s')));
+}
 
 #
 # <p> string functions
