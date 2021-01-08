@@ -158,6 +158,7 @@ uniqueIndex = function(v, U) {
 #	<§> string manipulation
 #
 
+#join = function(v, sep = " ")if (length(v) == 0) '' else paste(v, collapse = sep);
 join = function(v, sep = " ")paste(v, collapse = sep);
 con = function(..., Sep_ = '')paste(..., sep = Sep_);
 Con = function(..., Sep_ = '')paste(unlist(list(...)), collapse = Sep_);
@@ -3530,7 +3531,7 @@ Reshape.long = function(d, vars, factorColumn = 'repeat', valuePostfix = '_long'
 }
 
 # reshape rows in blocks to avoid memory exhaustion
-Reshape.long.byParts = function(d, ..., N = 1e4, path = tempfile()) {
+Reshape.long.byParts = function(d, ..., N = 1e4, path = tempfile(), filter = NULL) {
 	Nrow = nrow(d);
 	Nparts = ceiling(Nrow / N);
 
@@ -3538,6 +3539,7 @@ Reshape.long.byParts = function(d, ..., N = 1e4, path = tempfile()) {
 	for (i in 1:Nparts) {
 		dP = d[ (N*(i - 1) + 1):min((N*i), Nrow), ];
 		dL = Reshape.long(dP, ...);
+		if (notE(filter)) dL = filter(dL);
 		write.table(dL, file = path, col.names = i == 1, append = i != 1, row.names = F);
 	}
 	gc();
