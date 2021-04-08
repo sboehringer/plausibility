@@ -10,7 +10,7 @@ packageDefinition = list(
 	description = list(
 		title = 'Plausibility based estimation and inference',
 		author = 'Stefan B\uf6hringer <r-packages@s-boehringer.org>',
-		description = 'R-package to test model comparisons and to compute marginal and joint plausibility regions using the plausibility framework.',
+		description = 'R-package to implement important methods of the plausibility framework, including goodness-of-fit testing, test model comparisons and computation of marginal and joint plausibility regions.',
 		depends = c(),
 		suggests = c(),
 		license = 'LGPL',
@@ -114,7 +114,6 @@ regionObjective = function(objective, level = .95) {
 }
 
 setClass("plausibilityFamily", representation = list(
-	objectiveFunction = 'function',
 	f0 = 'formula',
 	f1 = 'formula',
 	data = 'data.frame',
@@ -527,6 +526,20 @@ setMethod('plausibility', 'plausibilityFamily',
 	return(rPl);
 });
 
+#' Compute weighted plausibility for a model comparison of binomial outcome
+#'
+#' A model comparison of binomial outcome for nested models is computed. The plausibility estimate and P-value are returned together with a glm-fit.
+#'
+#' @param f0 Null model given as R formula
+#' @param f1 Alternative model given as R formula
+#' @param data data frame
+#' @param optMethod Optimization method to use. Either 'grid' (default) or 'optim'
+#' @param Niter Number of iterations used when finding the plausibility estimate
+#' @param Nsi Number of stochastic integration samples (defaults to 1e3L)
+#' @param Nbinom Number of repetions in the binomial outcome
+#' @param ... Arguments passed to the optimizer
+#'
+#' @export PlausibilityBinomialWeighted
 PlausibilityBinomialWeighted = function(f0, f1, data, Nsi = 1e3L, Niter = 2L, ...,
 	optMethod = 'grid', Nbinom = 1L) {
 	start = NULL;

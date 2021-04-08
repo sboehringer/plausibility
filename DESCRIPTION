@@ -5,7 +5,7 @@ Version: 0.2-0
 Date: 2021-04-08
 Author: Stefan Böhringer <r-packages@s-boehringer.org>
 Maintainer: Stefan Böhringer <r-packages@s-boehringer.org>
-Description: R-package to test model comparisons and to compute marginal and joint plausibility regions using the plausibility framework.
+Description: R-package to implement important methods of the plausibility framework, including goodness-of-fit testing, test model comparisons and computation of marginal and joint plausibility regions.
 License: LGPL
 Encoding: UTF-8
 Depends: 

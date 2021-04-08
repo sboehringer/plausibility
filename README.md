@@ -6,4 +6,4 @@ install_github("sboehringer/plausibility")
 ```
 
 # Description
-R-package to test model comparisons and to compute marginal and joint plausibility regions using the plausibility framework.
+R-package to implement important methods of the plausibility framework, including goodness-of-fit testing, test model comparisons and computation of marginal and joint plausibility regions.
