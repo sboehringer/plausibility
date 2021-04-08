@@ -147,7 +147,8 @@ File.exists = function(path, host = '', agent = 'ssh', ssh = TRUE) {
 	r
 }
 
-File.copy_raw = function(from, to, ..., recursive = FALSE, agent = 'scp', logLevel = 6, ignore.shell = TRUE,
+File.copy_raw = function(from, to, ...,
+	overwrite = FALSE, recursive = FALSE, agent = 'scp', logLevel = 6, ignore.shell = TRUE,
 	symbolicLinkIfLocal = TRUE) {
 	spF = splitPath(from, ssh = TRUE);
 	spT = splitPath(to, ssh = TRUE);
@@ -160,7 +161,7 @@ File.copy_raw = function(from, to, ..., recursive = FALSE, agent = 'scp', logLev
 			file.symlink(spF$path, spT$path, ...);
 		} else {
 			LogS(4, 'Copy "%{from}s --> %{to}s', from = spF$path, to = spT$path);
-			file.copy(spF$path, spT$path, recursive = recursive, ...);
+			file.copy(spF$path, spT$path, recursive = recursive, ..., overwrite = overwrite);
 		}
 	} else {
 		# <A> assume 'to' to be atomic
@@ -852,7 +853,7 @@ stopS = function(str, ...)stop(Sprintf(str, ...));
 dprint = function(..., r__ = TRUE) {
 	vs = as.character(as.list(substitute(list(...)))[-1]);
 	ns = names(list(...));
-	Ns = ifelse(ns == '', vs, ns);
+	Ns = if (is.null(ns)) vs else ifelse(ns == '', vs, ns);
 	l = listKeyValue(Ns, c(...));
 	print(list2df(l));
 	if (r__) return(l);

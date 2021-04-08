@@ -863,7 +863,7 @@ count2blocks = function(counts) {
 #	expand a block list - for example as from count2blocks - to a list of integers
 #
 expandBlocks = function(blks) {
-	apply(matrix(blks, ncol = 2, byrow = TRUE), 1, function(r) { r[1]:r[2] } )
+	applyL(matrix(blks, ncol = 2, byrow = TRUE), 1, function(r) { r[1]:r[2] } )
 }
 
 # split 1:M into N partitions, return row-wise range
@@ -944,7 +944,8 @@ splitSeatsForFractions = function(Nseats, fractions = vn(rep(1, Nfractions)), Nf
 counts2idcs = function(counts) {
 	idcs = c(0, cumsum(counts));
 	idcs = cbind(idcs + 1, c(idcs[-1], 0))[-length(idcs), ];
-	idcs
+	if (is.null(counts)) return(idcs);	# matrix w/ 0 rows
+	t2r(idcs)	# fails on counts == NULL
 }
 
 # N is partitioned into fractions from p, where each element of p partitions the remaining part of N
@@ -1508,6 +1509,13 @@ Lundrop2row = function(l)lapply(l, undrop2row);
 undrop2col = function(e)(if (is.vector(e)) matrix(e, nrow = length(e)) else e);
 Lundrop2col = function(l)lapply(l, undrop2col);
 
+# return list from apply (undo simplify)
+applyL = function(X, MARGIN, FUN, ...) {
+	r = apply(X, MARGIN, FUN, ...);
+	if (is.matrix(r)) return(lapply(1:ncol(r), function(i)r[, i]));
+	if (!is.list(r) && is.vector(r)) return(lapply(1:length(r), function(i)r[i]));
+	return(r);
+}
 # USE.NAMES logic reversed for sapply
 sapplyn = function(l, f, ...)sapply(l, f, ..., USE.NAMES = FALSE);
 list.with.names = function(..., .key = 'name') {
@@ -1672,9 +1680,9 @@ listOfDataFrames2data.frame = function(l, idColumn = "id", do.unlist = TRUE, dir
 	if (!row.names) row.names(df) = NULL;
 	df
 }
-cbindDataFrames = function(l, do.unlist = FALSE) {
+cbindDataFrames = function(l, do.unlist = FALSE, colsFromUnion = FALSE) {
 	listOfDataFrames2data.frame(l, idColumn = NULL, do.unlist = do.unlist, direction = cbind,
-		resetColNames = FALSE)
+		resetColNames = FALSE, colsFromUnion = colsFromUnion)
 }
 # @param embed corresponds to colsFromUnion in listOfDataFrames2data.frame
 RbindDfs = function(dfl, namesFromFirst = TRUE, embed = FALSE) {
@@ -2430,6 +2438,7 @@ Dfselect = function(data, l, na.rm = nif) {
 DfSearch = function(dfSearch, dfSearched,
 	colNamesReset = 'col', colNameIdx = '.dfSearchIdx', returnIdcs = FALSE) {
 
+	if (is.null(dfSearched)) return(NULL);
 	nms = if (notE(colNamesReset)) {
 		nms = paste(colNamesReset, 1:ncol(dfSearched), sep = '');
 		names(dfSearch) = names(dfSearched) = nms;
@@ -2549,6 +2558,11 @@ shift = function(v)(v[-1])
 vectorLag = function(v, start = 0)pop(c(v, start) - c(start, v))
 splitN = function(N, by = 4) vectorLag(round(cumsum(rep(N/by, by))));
 splitToMax = function(N, max = 4) vectorLag(round(cumsum(rep(N/ceiling(N/max), ceiling(N/max)))));
+# split into fixed block sizes + last incomplete block
+splitBy = function(N, NperBlock = 4) {
+	Nlast = N %% NperBlock;
+	return(c(rep(NperBlock, N %/% NperBlock), if (Nlast == 0) c() else Nlast));
+}
 
 # cumsum returning indeces for numbers given in Ns
 cumsumI = function(Ns, offset = 1, do.pop = FALSE) {
@@ -2561,6 +2575,15 @@ cumsumR = function(l, offset = 1) {
 	cs0 = if (is.list(l)) lapply(l, cumsumR, offset = 0) else rev(cumsum(l))[1];
 	cs = vectorNamed(c(0, pop(unlist(cs0))) + offset, names(cs0));
 	cs
+}
+
+countsExtract = function(v, Ns, simplify = FALSE) {
+	cnts = counts2idcs(Ns);
+	r = apply(cnts, 1, function(r) {
+		r = v[ r[1] : r[2] ];
+		if (simplify) r else list(r)
+	});
+	return(if (!simplify) unlist.n(r, 1) else r);
 }
 
 #

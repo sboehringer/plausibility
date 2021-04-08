@@ -59,7 +59,14 @@ CallDelegate = function(functionBase, delegation, ..., restrictArgs = TRUE) {
 V2A = function(f)function(x, ...)do.call(f, c(as.list(x), list(...)));
 # call function with vector constructed from seperate arguments
 A2V = function(f)function(...)f(c(...));
+# arguments to matrix
+A2M = function(f)function(...)f(do.call(cbind, list(...)));
 
+A2VbyRow = function(f) function(...) {
+	m = do.call(cbind, list(...));
+	r = apply(m, 1, f);
+	return(r);
+}
 
 #
 #	<p> generic functions

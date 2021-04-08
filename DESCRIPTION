@@ -2,7 +2,7 @@ Package: plausibility
 Type: Package
 Title: Plausibility based estimation and inference
 Version: 0.2-0
-Date: 2021-01-08
+Date: 2021-04-08
 Author: Stefan Böhringer <r-packages@s-boehringer.org>
 Maintainer: Stefan Böhringer <r-packages@s-boehringer.org>
 Description: R-package to test model comparisons and to compute marginal and joint plausibility regions using the plausibility framework.
@@ -15,6 +15,6 @@ Collate:
     Rsystem.R
     Rfunctions.R
     RpropertyList.R
-    plausibilitySI.R
+    plausibility.R
 Suggests: 
 RoxygenNote: 7.0.1
