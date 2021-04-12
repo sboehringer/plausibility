@@ -1,4 +1,4 @@
-# R-package `plausibility`, version 0.2-0
+# R-package `plausibility`, version 0.3-0
 ## Installation
 ```{r}
 library(devtools);
