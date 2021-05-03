@@ -775,6 +775,9 @@ stdOutFromCall = function(call_) {
 # }
 # same as above, less dpendencies
 md5sumString = function(s, ...)substr(SystemS('echo -n %{s}q | md5sum', return.output = TRUE)$output, 1, 32)
+sha256sumString = function(s, ...)substr(SystemS('echo -n %{s}q | sha256sum', return.output = TRUE)$output, 1, 32)
+sha256sumPath = function(path, ...)substr(SystemS('sha256sum %{path}q', return.output = TRUE)$output, 1, 64)
+
 
 #
 #	<p> package documentation
@@ -904,17 +907,20 @@ relativePath = Vectorize(relativePathSingle, c('from', 'to'));
 SplitPath = function(path, ...)lapply(path, splitPath, ...);
 absolutePathSingle = function(path)splitPath(path)$absolute
 absolutePath = Vectorize(absolutePathSingle, c('path'));
+pathSimplify = function(p)gsub('[:]', '_', p)
 
 # 	createZip(list(results = c('r/ref1.html', 'r/ref2.html')), 'r/myZip.zip', doCopy = TRUE);
 
 createZip = function(input, output, pword, doCopy = FALSE, readmeText, readme, logOnly = FALSE,
-	absoluteSymlink = FALSE) {
+	absoluteSymlink = FALSE, simplifyFileNames = FALSE) {
 	destDir = splitPath(output)$fullbase;
 	Dir.create(destDir);
 	nelapply(input, function(n, e) {
 		subdir = join(c(destDir, n, ''), '/');
 		Dir.create(subdir);
-		to = paste(subdir, list.kpu(SplitPath(e), 'file'), sep = '/');
+		toFiles = list.kpu(SplitPath(e), 'file');
+		if (simplifyFileNames) toFiles = sapply(toFiles, pathSimplify);
+		to = paste(subdir, toFiles, sep = '/');
 		if (doCopy) file.copy(e, to) else {
 			#from = relativePath(subdir, e);
 			from = absolutePath(e);

@@ -175,7 +175,11 @@ setMethod('initialize', 'plausibilityFamilySI', function(.Object, f0, f1, data, 
 
 
 setClass("plausibilityGlm", contains = 'plausibilityFamilySI', representation = list(
-	mm = 'matrix'		# model matrix null
+	mm = 'matrix',		# model matrix null
+	par = 'numeric',	# starting par (MLE under f0, plausibility estimate)
+	mdl0 = 'list',		# glm model + corresponing ll
+	sim = 'matrix',		# stochastic outcomes under f0, N x Nsi
+	pSI = 'numeric'	# 
 ), prototype = list());
 
 setMethod('initialize', 'plausibilityGlm', function(.Object, f0, f1, data, objectiveFunction, Nsi) {
@@ -231,13 +235,11 @@ weightingFunctionLR = function(this, data, ...) {
 	-glmCompBinomial(this@f0, this@f1, data, ...)$lr;
 }
 
+setMethod('plausibilityDelta', 'plausibilityBinomial', function(this)this@mdl0$sds * 6)
+setGeneric("plausibilityStart", function(this)this@par)
 
 setClass('plausibilityBinomial', contains = 'plausibilityGlm', representation = list(
-	Nbinom = 'integer',	# #{binomial outcomes} == 1 for standard logistic regression
-	par = 'numeric',	# starting par (MLE under f0, plausibility estimate)
-	mdl0 = 'list',		# glm model + corresponing ll
-	sim = 'matrix',		# stochastic outcomes under f0, N x Nsi
-	pSI = 'numeric'	# 
+	Nbinom = 'integer'	# #{binomial outcomes} == 1 for standard logistic regression
 ), prototype = list(Nbinom = 1L));
 
 cumProbSIbinomial = function(par, this, epsPs = 1e-5) {
@@ -257,9 +259,6 @@ cumProbSIbinomial = function(par, this, epsPs = 1e-5) {
 	#print(t(c(par, P, sum(sel))));
 	return(P);
 }
-
-setMethod('plausibilityDelta', 'plausibilityBinomial', function(this)this@mdl0$sds * 6)
-setGeneric("plausibilityStart", function(this)this@par)
 
 setMethod('initialize', 'plausibilityBinomial', function(.Object, f0, data, Nsi = 1e3L, Nbinom = 1L,
 	start = NULL, weightingFunction = weightingFunctionLR, objectiveFunction = cumProbSIbinomial, sim = NULL, sampleFromAlt = TRUE) {
