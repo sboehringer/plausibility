@@ -908,6 +908,8 @@ SplitPath = function(path, ...)lapply(path, splitPath, ...);
 absolutePathSingle = function(path)splitPath(path)$absolute
 absolutePath = Vectorize(absolutePathSingle, c('path'));
 pathSimplify = function(p)gsub('[:]', '_', p)
+pathInsertPostfix = function(path, postfix, sep = '-')
+	Sprintf('%{fullbase}s%{sep}s%{postfix}s.%{ext}s', splitPath(path))
 
 # 	createZip(list(results = c('r/ref1.html', 'r/ref2.html')), 'r/myZip.zip', doCopy = TRUE);
 

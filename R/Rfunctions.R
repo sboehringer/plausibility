@@ -353,3 +353,23 @@ Optim = function(p, f, method = 'BFGS', control = list(), ...) {
 	return(o);
 }
 
+optimFn = function(p, f, method = 'BFGS', control = list(), lower = -Inf, upper = Inf, ...) {
+	control = merge.lists(OptimControlDefault, control);
+	o = if (length(p) > 1) {
+		myControl = List_(control, min_ = c('tol', 'startScale', 'hessian'));
+		optim(p, f, method = method, control = myControl, hessian = control$hessian, ...);
+	} else if (length(p) == 1) {
+		o0 = try(
+			optimize(f,
+				lower = lower, upper = upper,
+				tol = control$tol, maximum = control$fnscale < 0, ...)
+		);
+		if (class(o0) == 'try-error') list(par = NA, value = NA, hessian = NA) else 
+			list(
+				par = firstDef(o0$maximum, o0$minimum), value = o0$objective,
+				hessian = if (control$hessian) matrix(Dn2f(f, o0$maximum, ...)/o0$objective) else NA
+			)
+	} else list(par = c(), value = f(...));
+	return(o);
+}
+

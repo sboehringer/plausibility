@@ -1214,19 +1214,23 @@ list.kp.unquote = function(key) {
 
 # extract key path from list, general, recursive version
 #	key path recursive worker
-list.kprw = function(l, keys, unlist.pats, template, null2na, carryNames, test) {
+list.kprw = function(l, keys, unlist.pats, template, null2na, carryNames, test, keyAccess) {
+	if (!length(keys)) return(l);
 	key = keys[1];
 	# <p> extract key
 	r = if (key != "*") {
 		index = fetchRegexpr("\\A\\[\\[(\\d+)\\]\\]\\Z", key, captures = TRUE);
 		if (length(index) > 0) key = as.integer(index[[1]]);
-		if (is.list(l)) {
+		if (keyAccess[1] == '@') {
+			r = slot(l, key);
+			list.kprw(r, keys[-1], unlist.pats[-1], template, null2na, carryNames, test, keyAccess[-1]);
+		} else if (is.list(l)) {
 			# <N> logical(0) seen as NULL by second condition
 			r = if (is.null(l[[key]]) || length(l[[key]]) == 0) {
 					if (null2na) { NA } else firstDef(template, NULL)
 				} else l[[key]];
 			if (length(keys) > 1)
-				list.kprw(r, keys[-1], unlist.pats[-1], template, null2na, carryNames, test) else
+				list.kprw(r, keys[-1], unlist.pats[-1], template, null2na, carryNames, test, keyAccess[-1]) else
 				if (test) !(is.null(r) || all(is.na(r))) else r;
 		} else if (class(l) %in% c('character')) {
 			if (notE(names(l))) l[names(l) %in% key] else l[key]
@@ -1244,7 +1248,7 @@ list.kprw = function(l, keys, unlist.pats, template, null2na, carryNames, test) 
 	} else {
 		if (length(keys) > 1)
 			lapply(l, function(sl)
-				list.kprw(sl, keys[-1], unlist.pats[-1], template, null2na, carryNames, test)
+				list.kprw(sl, keys[-1], unlist.pats[-1], template, null2na, carryNames, test, keyAccess[-1])
 			) else l;
 	}
 	# <p> unlisting
@@ -1266,14 +1270,15 @@ list.kprwPar = function(l, keys, ...) {
 }
 
 # worker: keypath
-list.kprwkp = function(l, keyPath, ...) {
-	keysNew = fetchRegexpr("(?:[a-zA-Z0-9_.|\\[\\]*]+(?:\\\\[$])?)+", keyPath[1]);
+list.kprwkp = function(l, keyPath, ..., keyAccess) {
+	keysNew = fetchRegexpr("(?:[a-zA-Z0-9_.|\\[\\]*]+(?:\\\\[$@])?)+", keyPath[1]);
 	keys = c(keysNew, keyPath[-1]);
 	r = list.kprwPar(l, keys, ...);
 	r
 }
 
-list.kp.keys = function(keyPath) fetchRegexpr("[^$]+", keyPath);
+list.kp.keys = function(keyPath) fetchRegexpr("[^$@]+", keyPath);
+list.kp.method = function(keyPath) fetchRegexpr("[$@]", keyPath);
 
 # wrapper for list.kprw
 # keyPath obeys EL1 $ EL2 $ ..., where ELn is '*' or a literal
@@ -1282,11 +1287,15 @@ list.kp.keys = function(keyPath) fetchRegexpr("[^$]+", keyPath);
 list.kpr = function(l, keyPath, do.unlist = FALSE, template = NULL,
 	null2na = FALSE, unlist.pat = NULL, carryNames = TRUE, as.matrix = FALSE, test = FALSE) {
 	keys = list.kp.keys(keyPath);
+	# list or slot?
+	keyAccess = list.kp.method(keyPath);
+	# if first element is '*', assume list
+	if (length(keyAccess) < length(keys)) keyAccess = c('$', keyAccess);
 	unlist.pats = if (notE(unlist.pat)) as.logical(fetchRegexpr("[^$]+", unlist.pat)) else NULL;
 
 	# parallel keys
 	#r = list.kprwkp(l, keyPath, unlist.pats, template, null2na, carryNames, test = test);
-	r = list.kprw(l, keys, unlist.pats, template, null2na, carryNames, test = test);
+	r = list.kprw(l, keys, unlist.pats, template, null2na, carryNames, test = test, keyAccess = keyAccess);
 	if (do.unlist) { r = unlist(r); }
 	if (as.matrix) r = t(sapply(r, function(e)e));
 	r
@@ -1294,14 +1303,18 @@ list.kpr = function(l, keyPath, do.unlist = FALSE, template = NULL,
 # extract key path from list
 # <!> interface change: unlist -> do.unlist (Wed Sep 29 18:16:05 2010)
 # test: test existance instead of returning value
-list.kp = function(l, keyPath, do.unlist = FALSE, template = NULL, null2na = FALSE, test = FALSE, n) {
-	r = list.kpr(l, sprintf("*$%s", keyPath), do.unlist = do.unlist,
+list.kp = function(l, keyPath, do.unlist = FALSE, template = NULL, null2na = FALSE, test = FALSE, n,
+	pathAsIs = FALSE) {
+	fullPath = if (pathAsIs) keyPath else sprintf("*$%s", keyPath);
+	r = list.kpr(l, fullPath, do.unlist = do.unlist,
 		template = template, null2na = null2na, test = test);
 	if (!missing(n)) r = unlist.n(r, n);
 	r
 }
 
 list.kpu = function(..., do.unlist = TRUE)list.kp(..., do.unlist = do.unlist);
+# allow for slot access
+list.Kpu = function(..., do.unlist = TRUE)list.kp(..., do.unlist = do.unlist, pathAsIs = TRUE);
 
 list.keys = function(l, keys, default = NA) {
 	l = as.list(l);
@@ -1940,6 +1953,10 @@ factorWithLevels = function(f, levels_) {
 	levels(f) = levels_;
 	f
 }
+Rep.each = function(v, n) {
+	r = rep.each(v, n);
+	return(if (is.factor(v)) factorWithLevels(r, levels(v)) else r)
+}
 copyFactorStructure = function(dS, dD) {
 	factors = which(lapply(dS, class) == 'factor');
 	for (f in factors) dD[[f]] = factorWithLevels(dD[[f]], levels(dS[[f]]));
@@ -1951,8 +1968,9 @@ rep.each.row = function(m, n) {
 # 		r = Df_(r, names = names(m));
 # 		r = copyFactorStructure(m, r);
 # 	}
-	Is = rep.each(Seq(1, nrow(m)), n);
-	r = m[Is, , drop = FALSE];
+	r = if (is.data.frame(m))
+		Df_(lapply(m, Rep.each, n = n)) else
+		m[rep.each(Seq(1, nrow(m)), n), , drop = FALSE]
 	r
 }
 
@@ -2241,7 +2259,7 @@ v2freq = function(v)(v/sum(v))
 #	<p> numeric function
 #
 
-to.numeric = function(x) { suppressWarnings(as.numeric(x)) }
+to.numeric = function(x) { SetNames(suppressWarnings(as.numeric(x)), names(x)) }
 minFloor = function(x)(x - floor(x))
 
 #
@@ -2300,6 +2318,9 @@ DfAsCharacter = function(dataFrame, as_character) {
 	dataFrame[, as_character] = as.data.frame(do.call(cbind, dfn), stringsAsFactors = FALSE);
 	dataFrame
 }
+DfFac2num = function(dataFrame) {
+	return(do.call(data.frame, lapply(dataFrame, function(e)if (is.factor(e)) as.numeric(e) else e)))
+}
 DfApplyValueMap = function(r, valueMap, Df_doTrimValues = FALSE,
 	Df_mapping_value = '__df_mapping_value__',
 	Df_mapping_empty = '__DF_EMPTY__', Do_Df_mapping_empty = TRUE) {
@@ -2320,6 +2341,14 @@ DfApplyValueMap = function(r, valueMap, Df_doTrimValues = FALSE,
 	}
 	return(r);
 }
+# copy over factor structure from other data frame (tentamen/bw for example)
+DfEmbed = function(d, dSource) {
+	cols = nlapply(d, function(n) {
+		if (class(dSource[[n]]) == 'factor')factor(d[[n]], levels(dSource[[n]]))else d[[n]]
+	})
+	return(Df_(cols));
+}
+
 
 # as of 22.7.2013 <!>: min_ applied before names/headerMap
 # as of 19.12.2013 <!>: as.numeric -> as_numeric
