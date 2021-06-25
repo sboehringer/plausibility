@@ -2,6 +2,31 @@
 #	plausibilityModels.R
 #Thu Jun 17 17:03:40 CEST 2021
 
+#
+#	<p> generic model class
+#
+
+#
+#	<p> glm models
+#
+
+setGeneric("plausSample", function(this, u, lp, parAncil)NULL)
+setGeneric("plausDensity", function(this, x, lp, parAncil)-Inf)
+setGeneric("plausFit", function(this, y, mm)glmModel(mm, y, this))
+setGeneric("plausBounder", function(this, lp)lp)
+# estimate ancillory paramaters
+setGeneric("plausAncil", function(this, y, lp, ...)NULL)
+
+setClass('plausibilityModel', representation = list(
+	family = 'character'
+), prototype = list(family = 'gaussian'));
+
+setMethod('initialize', 'plausibilityModel', function(.Object, family = 'gaussian') {
+	.Object@family = family;
+	return(.Object);
+});
+setMethod("plausBounder", 'plausibilityModel', function(this, lp)lp)
+
 
 #
 #	<p> normal
