@@ -10,6 +10,7 @@ License: LGPL
 Encoding: UTF-8
 Depends: 
 Collate: 
+    plausibility.R
     plausibilityModels.R
     plausibilityOptim.R
     plausibilityPenalized.R
@@ -20,6 +21,5 @@ Collate:
     Rsystem.R
     Rfunctions.R
     RpropertyList.R
-    plausibility.R
 Suggests: 
 RoxygenNote: 7.0.1

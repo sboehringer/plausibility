@@ -24,7 +24,8 @@ packageDefinition = list(
 		readme = '## Installation\n```{r}\nlibrary(devtools);\ninstall_github("sboehringer/plausibility")\n```\n',
 		push = F,
 		pushOnNewVersion = T,
-		remote = 'https://github.com/sboehringer/plausibility.git'
+		#remote = 'https://github.com/sboehringer/plausibility.git'
+		remote = 'git@github.com:sboehringer/plausibility.git'
 	)
 );
 
