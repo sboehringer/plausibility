@@ -47,36 +47,6 @@ packageDefinition = list(
 #
 
 #
-#	<p> model classes
-#
-
-#
-#	<p> glm models
-#
-
-setGeneric("plausSample", function(this, u, lp, parAncil)NULL)
-setGeneric("plausDensity", function(this, x, lp, parAncil)-Inf)
-setGeneric("plausFit", function(this, y, mm)glmModel(mm, y, this))
-setGeneric("plausBounder", function(this, lp)lp)
-# estimate ancillory paramaters
-setGeneric("plausAncil", function(this, y, lp, ...)NULL)
-
-setClass('plausibilityModel', representation = list(
-	family = 'character'
-), prototype = list(family = 'gaussian'));
-
-setMethod('initialize', 'plausibilityModel', function(.Object, family = 'gaussian') {
-	.Object@family = family;
-	return(.Object);
-});
-setMethod("plausBounder", 'plausibilityModel', function(this, lp)lp)
-
-
-#
-#	</p> model classes
-#
-
-#
 #	<p> generic unweighted plausibility classes
 #
 
@@ -284,7 +254,7 @@ PlausibilityWeighted = function(f0, f1 = NULL, data, family,
 #' @param Nbinom Number of repetions in the binomial outcome
 #' @param ... Arguments passed to the optimizer
 #'
-#' @export PlausibilityBinomialWeighted
+#' @export Plausibility
 Plausibility = function(f0, f1 = NULL, data, family = 'binomial',
 	Nsi = 1e3L, Niter = 2L, optMethod = 'optim', ..., plClass, initArgs = list()) {
 
