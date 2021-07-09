@@ -18,7 +18,7 @@ packageDefinition = list(
 		depends = c(),
 		suggests = c(),
 		license = 'LGPL',
-		news = "0.4-1	Installation fixes\n0.4-0	Weighted plausibility, penalized models.\n0.3-0	Unweighted plausibility with stochastic integeration\n0.2-0	Implementation Plausibility region\n0.1-0   Initial release"
+		news = "0.5-0	Gaussian models, Penalized models\n0.4-1	Installation fixes\n0.4-0	Weighted plausibility, penalized models.\n0.3-0	Unweighted plausibility with stochastic integeration\n0.2-0	Implementation Plausibility region\n0.1-0   Initial release"
 	),
 	git = list(
 		readme = '## Installation\n```{r}\nlibrary(devtools);\ninstall_github("sboehringer/plausibility")\n```\n',
@@ -132,7 +132,7 @@ setMethod('initialize', 'plausibilityFamilyWeighted', function(.Object, f0, f1, 
 	objectiveFunction = dummyObjective, weightingFunction = identity) {
 
 	.Object = callNextMethod(.Object, f0, data, objectiveFunction);
-	.Object@f1 = f1;
+	.Object@f1 = formula.expand(f1, data);
 	.Object@weightingFunction = weightingFunction;
 	return(.Object);
 });
@@ -219,16 +219,26 @@ PlausibilityUnweighted = function(f0, data, family,
 	return(rPl);
 }
 
+plClasses = list(
+	binomial = 'plausibilityGlmWeighted',
+	gaussian = 'plausibilityGlmWeightedGaussian'
+);
+plFudgFactors = list(
+	binomial = 6,
+	gaussian = 4
+);
+
 PlausibilityWeighted = function(f0, f1 = NULL, data, family, 
-	Nsi = 1e3L, Niter = 2L, optMethod, ..., plClass, initArgs = list()) {
-	if (missing(plClass)) plClass = 'plausibilityGlmWeighted';
+	Nsi = 1e3L, Niter = 2L, optMethod, fudge = NULL, ..., plClass, initArgs = list()) {
+	if (missing(plClass)) plClass = plClasses[[family]];
+	if (is.null(fudge)) fudge = plFudgFactors[[family]];
 	modelNm = Sprintf('plausibilityModel%{family}u');
 	model = new(modelNm, family = family, ...);
 	Data = completeData(if (class(f1) != 'formula') f0 else f1, data);
 
 	start = NULL;
 	for (i in Seq(1, Niter)) {
-		args = c(list(f0 = f0, f1 = f1, data = Data, Nsi = Nsi, model = model), initArgs);
+		args = c(list(f0 = f0, f1 = f1, data = Data, Nsi = Nsi, model = model, fudge = fudge), initArgs);
 		pl = do.call('new', c(list(Class = plClass), args));
 		rPl = plausibility(pl, start = start, optMethod = optMethod);
 		start = rPl@par;

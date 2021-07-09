@@ -18,12 +18,10 @@ cumProbSIcomp = function(par, this) {
 	lp = plausBounder(this@model, lp);
 	parAncil = plausAncil(this@model, this@y, lp)
 	TsRaw = apply(this@sim, 2, function(y)plausDensity(this@model, y, lp, parAncil));
-	# importance sampling, cancel out uniform factor (max)
+	# importance sampling correction
 	TsIS0 = TsRaw - this@pSI;
-	#TsIS = TsIS0 - max(TsIS0);
-	#TsIS = TsIS0;
-	#Ts = log1pExp( TsIS0 );	# dampen weighing
-	Ts = TsIS0;
+	Ts = log1pExp( TsIS0, .5 );	# dampen weighing
+	#Ts = TsIS0;
 
 	#<A> comparison based on ll instead of -ll, keep on thies scale for IS correction
 	#sel = this@weight > this@weights;       # this is constant <N>
@@ -32,14 +30,14 @@ cumProbSIcomp = function(par, this) {
 	#if (length(Nsim) == 0) return(1e50 * .Machine$double.xmin);
 
 	# <p> P-value
-	eps = .1 / Nsim;
+	eps = 1e-3 / Nsim;
 	#eps = 0;
-	P = if (any(Ts == -Inf) || length(Ts) == 0)
-			(eps / 2) / (Nsim + eps) else
-			((sumExp(Ts) + eps) / (Nsim + eps));
-	#if (P > 1) browser();
+	if (any(Ts == -Inf) || length(Ts) == 0) return( eps / (Nsim + eps) );
+	P = ((sumExp(Ts) + eps) / (Nsim + eps));
 	#dprint(par, P);
-	return(1 - P);
+	#print(list(par, P));
+	#if (P > 1) browser();
+	return(P);
 }
 
 #
@@ -56,6 +54,13 @@ weightingFunctionLR = function(model, y, mm0, mm1) {
 	return( m1$ll - m0$ll );
 }
 
+fudgeLp = function(model, mm1, this, scale = 100, fudge = NULL) {
+	lp0 = (this@mm %*% this@mdl0$par)[, 1];
+	lp1 = (mm1 %*% plausFit(model, this@y, mm1)$par)[, 1];
+	if (is.null(fudge)) fudge = dim(mm1)[2] / dim(mm1)[1] * scale;
+	return( lp0 + (lp1 - lp0) / fudge);
+}
+
 setClass("plausibilityGlmWeighted", contains = 'plausibilityFamilyWeightedSI', representation = list(
 	pSI = 'numeric',
 	model = 'plausibilityModel',
@@ -67,13 +72,8 @@ setClass("plausibilityGlmWeighted", contains = 'plausibilityFamilyWeightedSI', r
 
 setMethod('initialize', 'plausibilityGlmWeighted', function(.Object, f0, f1, data, Nsi = 1e3, model,
 	start = NULL, objectiveFunction = cumProbSIcomp, sim = NULL, NmaxIS = 5,
-	weightingFunction = weightingFunctionLR, sampleFromAlt = TRUE, lp = NULL) {
+	weightingFunction = weightingFunctionLR, sampleFromAlt = TRUE, lp = NULL, fudge = 8) {
 
-	mm1 = model_matrix_from_formula(f1, data)$mm;
-	if (is.null(sim) && is.null(lp) && sampleFromAlt) {
-		y = data[, formula.response(f1)];
-		lp = (mm1 %*% plausFit(model, y, mm1)$par)[, 1];
-	}
 	# <p> initialize
 	.Object = callNextMethod(.Object, f0, f1, data, Nsi,
 		objectiveFunction = objectiveFunction,
@@ -83,8 +83,13 @@ setMethod('initialize', 'plausibilityGlmWeighted', function(.Object, f0, f1, dat
     .Object@model = model;
 	.Object@mdl0 = plausFit(model, .Object@y, .Object@mm);
 
-	# <p> linear predictor
-	if (is.null(lp)) lp = (.Object@mm %*% .Object@mdl0$par)[, 1];
+	# <p> sample from null/alternative
+	mm1 = model_matrix_from_formula(.Object@f1, data)$mm;
+	#lp = (mm1 %*% (plausFit(model, y, mm1)$par))[, 1];
+	lp = if (is.null(sim) && is.null(lp) && sampleFromAlt)
+		fudgeLp(model, mm1, .Object, fudge = fudge) else
+		(.Object@mm %*% .Object@mdl0$par)[, 1];
+
 	# <p> ancillary parameters
 	parAncil = plausAncil(model, .Object@y, lp);
 	# <p> stochastic integration sample	# plausSample(.Object, ., lp) %.% .
@@ -98,11 +103,11 @@ setMethod('initialize', 'plausibilityGlmWeighted', function(.Object, f0, f1, dat
 	weight = weightingFunction(model, .Object@y, .Object@mm, mm1);
 
 	# filter simulation for required sub-sample
-	.Object@sim = sim[, weights <= weight ];
+	.Object@sim = sim[, weights > weight ];
 
 	# <p> probabilities stochastic integration sample under starting pars, needed for importance correction
 	.Object@pSI = apply(.Object@sim, 2, function(r)plausDensity(model, r, lp, parAncil));
-
+	#print(list(N = sum(weights > weight), ll = .Object@pSI));
 	return(.Object);
 });
 setMethod('plausibilityStart', 'plausibilityGlmWeighted', function(this)this@mdl0$par);

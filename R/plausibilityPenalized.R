@@ -34,13 +34,14 @@ plausibilityPenalizedFit = function(y, X, family = 'gaussian', offset = NULL,
 }
 
 # <!> cave: first arbument is plaubility object, not model object
-weightingFunctionLRpenalized = function(p, y, mm0, X) {
+weightingFunctionLRpenalized = function(p, y, mm0, X, alpha) {
 	model = p@model;
 
 	# <p> models
 	m0 = plausFit(model, y, mm0);
 	lp0 =  (mm0 %*% m0$par)[, 1];
-	m1 = plausibilityPenalizedFit(y, X, family = model@family, offset = lp0, lambda = p@lambda);
+	m1 = plausibilityPenalizedFit(y, X, family = model@family, offset = lp0, lambda = p@lambda, alpha = alpha);
+	#print(m1$beta);
 	ll1 = plausDensity(model, y, m1$lp, plausAncil(model, y, m1$lp))
 
 	# ordering in favor of alternative has to be small values first
@@ -64,8 +65,8 @@ setClass("plausibilityPenalized", contains = 'plausibilityFamilyWeightedSI', rep
 
 setMethod('initialize', 'plausibilityPenalized', function(.Object, f0, f1, data, X, Nsi = 1e3, model,
 	start = NULL, objectiveFunction = cumProbSIcomp, sim = NULL, NmaxIS = 5,
-	weightingFunction = weightingFunctionLRpenalized, sampleFromAlt = TRUE, lp = NULL,
-	NlambdaSel = 1e1, Nfolds = 10, standardize = TRUE) {
+	weightingFunction = weightingFunctionLRpenalized, sampleFromAlt = TRUE, lp = NULL, fudge = NULL,
+	NlambdaSel = 1e1, Nfolds = 10, standardize = TRUE, alpha = 0) {
 
 	# <p> initialize
 	#	f1 used to complete data, here: alternative given as matrix X
@@ -85,7 +86,7 @@ setMethod('initialize', 'plausibilityPenalized', function(.Object, f0, f1, data,
 	# <p> sampling from alternative
 	if (is.null(sim) && is.null(lp) && sampleFromAlt) {
 		lp = plausibilityPenalizedFit(.Object@y, X, model@family,
-			offset = lp0, lambda = .Object@lambda)$lp[, 1];
+			offset = lp0, lambda = .Object@lambda, alpha = alpha)$lp[, 1];
 	}
 
 	# <p> linear predictor
@@ -96,17 +97,17 @@ setMethod('initialize', 'plausibilityPenalized', function(.Object, f0, f1, data,
 	if (is.null(sim))
 		sim = apply(matrix(runif(length(lp) * Nsi), ncol = Nsi), 2, function(u)
 			plausSample(model, u, lp, parAncil));
-	.Object@sim = sim;
+
+	# <p> data weight
+	weight = weightingFunction(.Object, .Object@y, .Object@mm, X, alpha);
+	# <p> simulation weights
+	weights = apply(sim, 2, function(y)weightingFunction(.Object, y, .Object@mm, X, alpha));
+
+	# filter simulation for required sub-sample
+	.Object@sim = sim[, weights > weight ];
 
 	# <p> probabilities stochastic integration sample under starting pars, needed for importance correction
-	.Object@pSI = apply(sim, 2, function(y)plausDensity(model, y, lp, parAncil));
-	# <p> data weight
-	.Object@weight = weightingFunction(.Object, .Object@y, .Object@mm, X);
-	# <p> simulation weights
-	.Object@weights = apply(sim, 2, function(y)weightingFunction(.Object, y, .Object@mm, X));
-
-	#stem(.Object@weights);
-	#print(.Object@weight);
+	.Object@pSI = apply(.Object@sim, 2, function(r)plausDensity(model, r, lp, parAncil));
 
 	return(.Object);
 });

@@ -10,20 +10,21 @@
 #	<p> glm model helper classes
 #
 
-glmLL = function(par, X, y, this) plausDensity(this, y,  (X %*% par)[, 1]);
-glmModelOptimize = function(X, y, this) {
+glmLL = function(par, X, y, this, offset = 0) plausDensity(this, y,  (X %*% par)[, 1] + offset);
+glmModelOptimize = function(X, y, this, offset) {
 	start = rep(0, length(this@par));
 	o = try(
-		optim(start, glmLL, method = 'BFGS', control = list(fnscale = -1), X = X, y = y, this = this)
+		optim(start, glmLL, method = 'BFGS', control = list(fnscale = -1),
+			X = X, y = y, this = this, offset = offset)
 	, silent = T);
 	if (class(o) == 'try-error') browser();
 	return(list(par = o$par, ll = o$value))
 }
-glmModel = function(X, y, this) {
-	m = glm(y ~ . + 0, as.data.frame(cbind(X, y)), family = this@family);
+glmModel = function(X, y, this, offset = 0) {
+	m = glm(y ~ . + 0, as.data.frame(cbind(X, y)), family = this@family, offset = recycle(offset, y)[[1]]);
 	parAncil = plausAncil(this, y, m$linear.predictors)
 	ll = plausDensity(this, y, m$linear.predictors, parAncil);
-	if (ll == -Inf) return(glmModelOptimize(X, y, this));
+	if (ll == -Inf) return(glmModelOptimize(X, y, this, offset));
 	return(list(par = m$coefficients, ll = ll, sds = sqrt(diag(vcov(m))), model = m));
 }
 
@@ -69,7 +70,7 @@ setClass("plausibilityGlm", contains = 'plausibilityFamilySI', representation = 
 
 setMethod('initialize', 'plausibilityGlm', function(.Object,
 	f0, data, Nsi = 1e3L,
-	model, start = NULL, objectiveFunction = cumProbSI, sim = NULL, NmaxIS = 5, lp = NULL) {
+	model, start = NULL, objectiveFunction = cumProbSI, sim = NULL, NmaxIS = 5L, lp = NULL) {
 
 	# <p> initialize
 	.Object = callNextMethod(.Object, f0, data, objectiveFunction, Nsi);
