@@ -12,9 +12,9 @@ Depends:
 Collate: 
     plausibilityModels.R
     plausibilityOptim.R
-    plausibilityPenalized.R
     plausibilityUnweighted.R
     plausibilityWeighted.R
+    plausibilityPenalized.R
     Rmeta.R
     Rdata.R
     Rsystem.R

@@ -8,7 +8,7 @@ packageDefinition = list(
 	name = 'plausibility',
 	files = c(
 		c(	'plausibilityModels.R', 'plausibilityOptim.R',
-			'plausibilityPenalized.R', 'plausibilityUnweighted.R', 'plausibilityWeighted.R'),
+			'plausibilityUnweighted.R', 'plausibilityWeighted.R', 'plausibilityPenalized.R'),
 		c('Rmeta.R', 'Rdata.R', 'Rsystem.R', 'Rfunctions.R', 'RpropertyList.R', 'Rstatistic.R')
 	),
 	description = list(
