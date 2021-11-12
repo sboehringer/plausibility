@@ -10,11 +10,13 @@ License: LGPL
 Encoding: UTF-8
 Depends: 
 Collate: 
+    plausibilityBase.R
     plausibilityModels.R
     plausibilityOptim.R
     plausibilityUnweighted.R
     plausibilityWeighted.R
     plausibilityPenalized.R
+    plausibilityWeightedGaussian.R
     Rmeta.R
     Rdata.R
     Rsystem.R

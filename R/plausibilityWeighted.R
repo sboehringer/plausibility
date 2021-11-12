@@ -2,8 +2,6 @@
 #	plausbilityWeighted.R
 #Thu Jun 17 17:11:33 CEST 2021
 
-require('glmnet');
-
 #
 #	<p> weighted models
 #

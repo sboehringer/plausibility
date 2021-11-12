@@ -2,6 +2,7 @@
 #	plausibilityPenalized.R
 #Thu Jun 17 18:49:49 CEST 2021
 
+require('glmnet');
 
 #
 #	<p> helper functions
