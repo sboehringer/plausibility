@@ -83,6 +83,11 @@ path.absolute = absolutePath = function(path, home.dir = TRUE, ssh = TRUE) {
 		path = sprintf("%s/%s", Sys.getenv('HOME'), substr(path, 3, nchar(path)));
 	if (nchar(path) > 0 && substr(path, 1, 1) == "/") path else sprintf("%s/%s", getwd(), path)
 }
+pathSimplify = function(path) {
+	path = gsub('(^./|/.(?=/|$))', '', path, perl = TRUE);
+	return(path);
+}
+
 tempFileName = function(prefix, extension = NULL, digits = 6, retries = 5, inRtmp = FALSE,
 	createDir = FALSE, home.dir = TRUE, doNotTouch = FALSE) {
 	ext = if (is.null(extension)) '' else sprintf('.%s', extension);
@@ -202,7 +207,8 @@ File.remove = function(path, ..., agent = 'ssh', ssh = TRUE, logLevel = 6) {
 }
 
 # <i> remote operations
-File.symlink = function(from, to, replace = TRUE, agent = 'ssh', ssh = FALSE, logLevel = 6) {
+File.symlink = function(from, to, replace = TRUE, agent = 'ssh', ssh = FALSE, logLevel = 6,
+	warnings = FALSE) {
 	r = if (ssh) {
 		sp = splitPath(from, skipExists = TRUE, ssh = TRUE);
 		host = sp$userhost;
@@ -212,7 +218,9 @@ File.symlink = function(from, to, replace = TRUE, agent = 'ssh', ssh = FALSE, lo
 	} else {
 		Log(sprintf('symlink %s -> %s', qs(from), qs(to)), logLevel);
 		if (replace && file.exists(to)) file.remove(to);
-		file.symlink(from, to);
+		if (warnings)
+			file.symlink(from, to) else
+			suppressWarnings(file.symlink(from, to))
 	}
 	r
 }
@@ -581,9 +589,8 @@ silence = function(expr, verbose = FALSE) {
 	if (verbose || Sys.info()['sysname'] == 'Windows') eval(expr) else {
 		sink('/dev/null', type = 'output');
 		sink(stdout(), type = 'message');
+		on.exit({ sink(type = 'message'); sink(type = 'output'); });
 		r = eval(expr);
-		sink(type = 'message');
-		sink(type = 'output');
 		r
 	}
 }

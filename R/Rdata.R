@@ -1330,6 +1330,43 @@ listReverseHierarchy = function(l, unlist = FALSE) {
 	return(r);
 }
 
+# return pair of lists: keys to access element, value
+list.flatten_raw = function(lol, prefix = list(), ignoreIndeces = TRUE) {
+	ns = names(lol);
+	if (is.null(ns)) ns = 1:length(lol);
+	r = unlist.n(lapply(ns, function(n) {
+		# generate list of lists, each entry being list(key path), value
+		if (is.list(lol[[n]])) {
+			prefix = if (ignoreIndeces && is.integer(n)) prefix else c(prefix, list(n));
+			list.flatten_raw(lol[[n]], prefix = prefix)
+		} else list(list(c(prefix, list(n)), lol[[n]]));
+	}), 1);
+	return(r);
+}
+
+# return flat list with keys representing keyPath
+#	alternative: return pair with keys, values, keys joined or list
+list.flatten = function(lol, joinby = NULL, aspairs = TRUE, ignoreIndeces = TRUE) {
+	r = list.flatten_raw(lol, ignoreIndeces = ignoreIndeces);
+	if (aspairs && is.null(joinby)) return(r);
+	keys = list.kp(r, '[[1]]');
+	values = list.kp(r, '[[2]]');
+	if (is.null(joinby)) return(list(keys = keys, values = values));
+	return(listKeyValue(sapply(list.kp(r, '[[1]]'), join, sep = joinby), values));
+}
+
+
+# analogous to list.merge; instead of merging, append entries
+list.accrue = function(lol, sep = ':', ignoreIndeces = TRUE) {
+	es = list.flatten(lol, joinby = sep, ignoreIndeces = ignoreIndeces);
+	ns = names(es)
+	r = list();
+	for (i in seq_along(es)) {
+		r[[ns[i]]] = union(r[[ns[i]]], es[[i]])
+	}
+	return(r);
+}
+
 null2na = function(l) {
 	if (!length(l)) return(l);
 	l[sapply(l, is.null)] = NA;
@@ -1560,7 +1597,7 @@ SetNames = function(o, names, rnames, cnames, Dimnames, embed = FALSE) {
 	if (!missing(rnames)) row.names(o) = rnames;
 	if (!missing(cnames)) dimnames(o)[[2]] = cnames;
 	if (!missing(names)) {
-		if (class(o) == 'matrix') {
+		if (any(class(o) == 'matrix')) {
 			if (embed) dimnames(o)[[2]][seq_along(names)] = names else {
 				ns = if (is.list(names)) vector.replace(dimnames(o)[[2]], names) else names;
 				if (is.null(dimnames(o))) dimnames(o) = list(NULL, ns) else dimnames(o)[[2]] = ns;
@@ -1811,6 +1848,8 @@ ListOfLists2df = function(l,
 	r
 }
 
+# select elements from iterable (<=> perl grep)
+Select = function(l, f, ...)return(l[sapply(l, f, ...)]);
 
 # # d: data frame, l: list with names corresponding to cols, values to be searched for in columns
 searchDataFrame = function(d, l, .remove.factors = TRUE) {
@@ -2241,18 +2280,27 @@ table.n.freq = function(...) {
 	r = t0 / sum(t0);
 	r
 }
-Table = function(v, min, max, ..., cats) {
+table2df = function(tab) {
+	df0 = Df_(tab);
+	nms = setdiff(names(df0), 'Freq');
+	f = do.call(formulaWith, as.list(nms));
+	dcast(df0, f, value.var= 'Freq')
+}
+Table = function(v, min, max, ..., cats, asDf = FALSE) {
 	if (missing(min) && missing(max) && missing(cats)) return(table(v, ...));
 	if (!missing(cats)) {
 		d = Df_(lapply(v, Avu));
-		catsV = Df_(merge.multi.list(cats));
-		return(table(rbind(d, catsV)) - 1);
+		catsV = SetNames(Df_(merge.multi.list(cats)), names(d));
+		t0 = table(rbind(d, catsV)) - 1;
+		return(if (asDf) table2df(t0) else t0);
 	} else {
 		if (missing(min)) min = min(v);
 		if (missing(max)) max = max(v);
-		return(table.n(v, n = max, min = min));
+		t0 = table.n(v, n = max, min = min);
+		return(if (asDf) table2df(t0) else t0);
 	}
 }
+TableDf = function(v, min, max, ..., cats, asDf = TRUE)Table(v, min, max, ..., cats = cats, asDf = asDf);
 v2freq = function(v)(v/sum(v))
 
 #
@@ -2349,6 +2397,13 @@ DfEmbed = function(d, dSource) {
 	return(Df_(cols));
 }
 
+#	r = strptime(col, dateFormat[1], tz = firstDef(dateFormat[2], defaultTz));
+
+DfDate = function(dataFrame, as_date, format = '%F', tz = 'UTC') {
+	dfn = nlapply(as_date, function(n)Df_(strptime(dataFrame[[n]], format, tz), names = n));
+	dataFrame[, as_date] = do.call(cbind, dfn);
+	dataFrame
+}
 
 # as of 22.7.2013 <!>: min_ applied before names/headerMap
 # as of 19.12.2013 <!>: as.numeric -> as_numeric
@@ -2360,7 +2415,8 @@ Df_ = function(df0, headerMap = NULL, names = NULL, min_ = NULL,
 	row.names = NA, valueMap = NULL, Df_as_is = TRUE, simplify_ = FALSE,
 	deep_simplify_ = FALSE, t_ = FALSE, unlist_cols = FALSE, transf_log = NULL, transf_m1 = NULL,
 	Df_doTrimValues = FALSE, Df_mapping_value = '__df_mapping_value__',
-	Df_mapping_empty = '__DF_EMPTY__', Do_Df_mapping_empty = TRUE, apply_ = FALSE) {
+	Df_mapping_empty = '__DF_EMPTY__', Do_Df_mapping_empty = TRUE, apply_ = FALSE,
+	as_date = NULL, date_format = '%F', date_tz = 'UTC') {
 	# <p> input sanitation
 	#r = as.data.frame(df0);
 	# for a vector with identical names for each entry, use this as a column name
@@ -2412,6 +2468,7 @@ Df_ = function(df0, headerMap = NULL, names = NULL, min_ = NULL,
 		#r[, as_factor] = dfn;
 		for (f in as_factor) r[, f] = as.factor(r[[f]]);
 	}
+	if (notE(as_date)) r = DfDate(r, as_date, date_format, date_tz);
 	#
 	#	<p> value map
 	#
@@ -3267,7 +3324,8 @@ iterateModels = function(modelList, f = function(...)list(...), ...,
 	callWithList = FALSE, callMode = NULL,
 	symbolizer = iterateModelsDefaultSymbolizer, symbolizerMode = 'inlist',
 	restrictArgs = TRUE, selectIdcs = NULL,
-	.first.constant = TRUE, parallel = FALSE, lapply__, reverseEvaluationOrder = TRUE) {
+	.first.constant = TRUE, parallel = FALSE, lapply__, reverseEvaluationOrder = TRUE,
+	modelTags = FALSE) {
 	# <p> pre-conditions
 	nsDupl = duplicated(names(modelList));
 	if (any(nsDupl))
@@ -3296,13 +3354,24 @@ iterateModels = function(modelList, f = function(...)list(...), ...,
 
 	# <p> models to be iterated
 	modelsIt = if (reverseEvaluationOrder) models[rev(1:nrow(models)), , drop = FALSE] else models;
+	metaStartTime = Sys.time();
 	r = iterateModels_raw(modelList, modelsIt, f_iterate = f,
 		callMode = callMode, restrictArgs = restrictArgs, ..., parallel = parallel);
+	metaStopTime = Sys.time();
 	if (reverseEvaluationOrder) r = rev(r);
+	if (modelTags) {
+		ns = dimnames(models_symbolic)[[2]]
+		names(r) = apply(models_symbolic, 1, function(mr)
+			join(apply(cbind(ns, mr), 1, join, sep = ':'), sep = '-'));
+		#dimnames(models_symbolic)[[1]] = names(r);
+	}
 	r = if (.resultsOnly) r else list(
 		models = models,
 		results = r,
-		models_symbolic = models_symbolic
+		models_symbolic = models_symbolic,
+		meta = list(
+			time = list(start = metaStartTime, stop = metaStopTime, duration = metaStopTime - metaStartTime)
+		)
 	);
 	r = unlist.n(r, .unlist);
 	r

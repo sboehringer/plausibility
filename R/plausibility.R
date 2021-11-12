@@ -9,7 +9,7 @@ packageDefinition = list(
 	files = c(
 		c(	'plausibilityModels.R', 'plausibilityOptim.R',
 			'plausibilityPenalized.R', 'plausibilityUnweighted.R', 'plausibilityWeighted.R'),
-		c('Rmeta.R', 'Rdata.R', 'Rsystem.R', 'Rfunctions.R', 'RpropertyList.R')
+		c('Rmeta.R', 'Rdata.R', 'Rsystem.R', 'Rfunctions.R', 'RpropertyList.R', 'Rstatistic.R')
 	),
 	description = list(
 		title = 'Plausibility based estimation and inference',
@@ -225,7 +225,8 @@ plClasses = list(
 );
 plFudgFactors = list(
 	binomial = 6,
-	gaussian = 4
+	gaussian = 4,
+	NIbinomial = 1
 );
 
 PlausibilityWeighted = function(f0, f1 = NULL, data, family, 
@@ -238,7 +239,9 @@ PlausibilityWeighted = function(f0, f1 = NULL, data, family,
 
 	start = NULL;
 	for (i in Seq(1, Niter)) {
-		args = c(list(f0 = f0, f1 = f1, data = Data, Nsi = Nsi, model = model, fudge = fudge), initArgs);
+		args = merge.lists(
+			list(f0 = f0, f1 = f1, data = Data, Nsi = Nsi, model = model, fudge = fudge),
+			initArgs);
 		pl = do.call('new', c(list(Class = plClass), args));
 		rPl = plausibility(pl, start = start, optMethod = optMethod);
 		start = rPl@par;

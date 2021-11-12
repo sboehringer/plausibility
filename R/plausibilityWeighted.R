@@ -9,18 +9,21 @@ require('glmnet');
 #
 
 log1pExp = function(x, scale = 1) ifelse (x * scale < -5, x, log(log1p(exp(x * scale))) / scale) 
+logAtOff = function(x, off = 3) { ifelse (x <= off, x, log1p(ifelse(x < off, off, x) - off) + off)  }
+dampen = log1pExp;
 
-cumProbSIcomp = function(par, this) {
+cumProbSIcomp = function(par, this, dampen = logAtOff) {
 	N = length(this@y);
 	Nsim = this@Nsi;
-	lp = (this@mm %*% par)[, 1];
+	#lp = (this@mm %*% par)[, 1];
+	lp = plausLp(this@model, par, this@mm);
 	# help optimizer, if necessary (e.g. bound away form 0, 1), defaults to identity
 	lp = plausBounder(this@model, lp);
 	parAncil = plausAncil(this@model, this@y, lp)
 	TsRaw = apply(this@sim, 2, function(y)plausDensity(this@model, y, lp, parAncil));
 	# importance sampling correction
 	TsIS0 = TsRaw - this@pSI;
-	Ts = log1pExp( TsIS0, .5 );	# dampen weighing
+	Ts = dampen( TsIS0 );	# dampen weighing
 	#Ts = TsIS0;
 
 	#<A> comparison based on ll instead of -ll, keep on thies scale for IS correction
@@ -36,7 +39,13 @@ cumProbSIcomp = function(par, this) {
 	P = ((sumExp(Ts) + eps) / (Nsim + eps));
 	#dprint(par, P);
 	#print(list(par, P));
-	#if (P > 1) browser();
+	#if (P > 1.2) browser();
+	if (P < 1e-6 && abs(par - this@mdl0$par) < .05) {
+		lr = NILR(df2LRmatrix(Df(y = this@y, x = this@mm[, 2])), this@model@fnull);
+		parLr = c(lr$o[[2]]$par[1], niH02h1(lr$o[[2]]$par, this@model@fnull));
+		print(c(par = par, parLr = parLr, P = P, T = exp(Ts[1:5]), lp = c(lp[1:5], lp[201:205])));
+		#browser();
+	}
 	return(P);
 }
 
@@ -55,9 +64,12 @@ weightingFunctionLR = function(model, y, mm0, mm1) {
 }
 
 fudgeLp = function(model, mm1, this, scale = 100, fudge = NULL) {
-	lp0 = (this@mm %*% this@mdl0$par)[, 1];
-	lp1 = (mm1 %*% plausFit(model, this@y, mm1)$par)[, 1];
+	#lp0 = (this@mm %*% this@mdl0$par)[, 1];
+	lp0 = plausLp(model, this@mdl0$par, this@mm);
+	#lp1 = (mm1 %*% plausFit(model, this@y, mm1)$par)[, 1];
+	lp1 = plausLpAlt(model, plausFitAlt(model, this@y, mm1)$par, mm1);
 	if (is.null(fudge)) fudge = dim(mm1)[2] / dim(mm1)[1] * scale;
+	if (fudge < 1) warning(Sprintf('Fudge factor %{fudge}f < 1'));
 	return( lp0 + (lp1 - lp0) / fudge);
 }
 
@@ -88,7 +100,8 @@ setMethod('initialize', 'plausibilityGlmWeighted', function(.Object, f0, f1, dat
 	#lp = (mm1 %*% (plausFit(model, y, mm1)$par))[, 1];
 	lp = if (is.null(sim) && is.null(lp) && sampleFromAlt)
 		fudgeLp(model, mm1, .Object, fudge = fudge) else
-		(.Object@mm %*% .Object@mdl0$par)[, 1];
+		#(.Object@mm %*% .Object@mdl0$par)[, 1];
+		plausLp(this, .Object@mdl0$par, .Object@mm);
 
 	# <p> ancillary parameters
 	parAncil = plausAncil(model, .Object@y, lp);
@@ -103,10 +116,21 @@ setMethod('initialize', 'plausibilityGlmWeighted', function(.Object, f0, f1, dat
 	weight = weightingFunction(model, .Object@y, .Object@mm, mm1);
 
 	# filter simulation for required sub-sample
-	.Object@sim = sim[, weights > weight ];
+	#	assume weights tb LRs -> large values in rejection region
+	#	">=" instead of ">" necessary for point masses
+	.Object@sim = sim[, weights >= weight, drop = FALSE ];
+	#dprint(sum(weights > weight));
+
+	if (sum(weights >= weight) == 0) warning('Plausib: no samples generated more extreme than data');
+	#if (sum(weights >= weight) == 0) browser();
+	lr = NILR(df2LRmatrix(Df(y = .Object@y, x = .Object@mm[, 2])), .Object@model@fnull);
+	parLr = c(lr$o[[2]]$par[1], niH02h1(lr$o[[2]]$par, .Object@model@fnull));
+	#if (sum(weights >= weight) == Nsi && lr$o[[2]]$par[2] > 0) browser();
 
 	# <p> probabilities stochastic integration sample under starting pars, needed for importance correction
 	.Object@pSI = apply(.Object@sim, 2, function(r)plausDensity(model, r, lp, parAncil));
+print(df2LRmatrix(Df(y = .Object@y, x = .Object@mm[, -1])));
+print(c(Nweights = sum(weights >= weight), weight = weight, par = .Object@mdl0$par, parAlt = plausFitAlt(model, .Object@y, mm1)$par), lp = c(lp[1:5], lp[201:205]));
 	#print(list(N = sum(weights > weight), ll = .Object@pSI));
 	return(.Object);
 });

@@ -10,13 +10,22 @@
 #	<p> glm models
 #
 
+# <p> core methods
 setGeneric("plausSample", function(this, u, lp, parAncil)NULL)
 setGeneric("plausDensityS", function(this, x, lp, parAncil)-Inf)
-setGeneric("plausDensity", function(this, x, lp, parAncil)sum(plausDensityS(this, x, lp, parAncil)))
 setGeneric("plausFit", function(this, y, mm, offset = 0)glmModel(mm, y, this, offset))
+
+# <p> methods with "good" defaults
+setGeneric("plausDensity", function(this, x, lp, parAncil)sum(plausDensityS(this, x, lp, parAncil)))
 setGeneric("plausBounder", function(this, lp)lp)
-# estimate ancillory paramaters
+setGeneric("plausLp", function(this, par, mm){ (mm %*% par)[, 1] })
+
+# <p> estimate ancillory paramaters
 setGeneric("plausAncil", function(this, y, lp, ...)NULL)
+
+# methods alternative model, used for equivalence hyptotheses, default to non-Alt methods
+setGeneric("plausFitAlt", function(this, y, mm, offset = 0)plausFit(this, y, mm, offset = 0))
+setGeneric("plausLpAlt", function(this, par, mm)plausLp(this, par, mm))
 
 setClass('plausibilityModel', representation = list(
 	family = 'character'

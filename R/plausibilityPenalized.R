@@ -45,7 +45,7 @@ weightingFunctionLRpenalized = function(p, y, mm0, X, alpha) {
 	ll1 = plausDensity(model, y, m1$lp, plausAncil(model, y, m1$lp))
 
 	# ordering in favor of alternative has to be small values first
-	return(2*( ll1 - m0$ll));
+	return( ll1 - m0$ll );
 }
 
 

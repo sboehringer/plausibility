@@ -2,7 +2,7 @@ Package: plausibility
 Type: Package
 Title: Plausibility based estimation and inference
 Version: 0.5-0
-Date: 2021-07-09
+Date: 2021-11-12
 Author: Stefan Böhringer <r-packages@s-boehringer.org>
 Maintainer: Stefan Böhringer <r-packages@s-boehringer.org>
 Description: R-package to implement important methods of the plausibility framework, including goodness-of-fit testing, test model comparisons and computation of marginal and joint plausibility regions.
@@ -10,7 +10,6 @@ License: LGPL
 Encoding: UTF-8
 Depends: 
 Collate: 
-    plausibility.R
     plausibilityModels.R
     plausibilityOptim.R
     plausibilityPenalized.R
@@ -21,5 +20,7 @@ Collate:
     Rsystem.R
     Rfunctions.R
     RpropertyList.R
+    Rstatistic.R
+    plausibility.R
 Suggests: 
-RoxygenNote: 7.0.1
+RoxygenNote: 7.1.2
