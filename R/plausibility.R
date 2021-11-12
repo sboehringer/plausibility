@@ -18,7 +18,7 @@ packageDefinition = list(
 		depends = c(),
 		suggests = c(),
 		license = 'LGPL',
-		news = "0.5-0	Gaussian models, Penalized models\n0.4-1	Installation fixes\n0.4-0	Weighted plausibility, penalized models.\n0.3-0	Unweighted plausibility with stochastic integeration\n0.2-0	Implementation Plausibility region\n0.1-0   Initial release"
+		news = "0.5-1	Package dependencies\n0.5-0	Gaussian models, Penalized models\n0.4-1	Installation fixes\n0.4-0	Weighted plausibility, penalized models.\n0.3-0	Unweighted plausibility with stochastic integeration\n0.2-0	Implementation Plausibility region\n0.1-0   Initial release"
 	),
 	git = list(
 		readme = '## Installation\n```{r}\nlibrary(devtools);\ninstall_github("sboehringer/plausibility")\n```\n',
