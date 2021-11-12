@@ -1,7 +1,7 @@
 Package: plausibility
 Type: Package
 Title: Plausibility based estimation and inference
-Version: 0.5-1
+Version: 0.5-2
 Date: 2021-11-12
 Author: Stefan Böhringer <r-packages@s-boehringer.org>
 Maintainer: Stefan Böhringer <r-packages@s-boehringer.org>
