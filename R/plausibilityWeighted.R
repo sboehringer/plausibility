@@ -38,12 +38,12 @@ cumProbSIcomp = function(par, this, dampen = logAtOff) {
 	#dprint(par, P);
 	#print(list(par, P));
 	#if (P > 1.2) browser();
-	if (P < 1e-6 && abs(par - this@mdl0$par) < .05) {
-		lr = NILR(df2LRmatrix(Df(y = this@y, x = this@mm[, 2])), this@model@fnull);
-		parLr = c(lr$o[[2]]$par[1], niH02h1(lr$o[[2]]$par, this@model@fnull));
-		print(c(par = par, parLr = parLr, P = P, T = exp(Ts[1:5]), lp = c(lp[1:5], lp[201:205])));
-		#browser();
-	}
+# 	if (P < 1e-6 && abs(par - this@mdl0$par) < .05) {
+# 		lr = NILR(df2LRmatrix(Df(y = this@y, x = this@mm[, 2])), this@model@fnull);
+# 		parLr = c(lr$o[[2]]$par[1], niH02h1(lr$o[[2]]$par, this@model@fnull));
+# 		print(c(par = par, parLr = parLr, P = P, T = exp(Ts[1:5]), lp = c(lp[1:5], lp[201:205])));
+# 		#browser();
+# 	}
 	return(P);
 }
 
@@ -121,14 +121,14 @@ setMethod('initialize', 'plausibilityGlmWeighted', function(.Object, f0, f1, dat
 
 	if (sum(weights >= weight) == 0) warning('Plausib: no samples generated more extreme than data');
 	#if (sum(weights >= weight) == 0) browser();
-	lr = NILR(df2LRmatrix(Df(y = .Object@y, x = .Object@mm[, 2])), .Object@model@fnull);
-	parLr = c(lr$o[[2]]$par[1], niH02h1(lr$o[[2]]$par, .Object@model@fnull));
+	#lr = NILR(df2LRmatrix(Df(y = .Object@y, x = .Object@mm[, 2])), .Object@model@fnull);
+	#parLr = c(lr$o[[2]]$par[1], niH02h1(lr$o[[2]]$par, .Object@model@fnull));
 	#if (sum(weights >= weight) == Nsi && lr$o[[2]]$par[2] > 0) browser();
 
 	# <p> probabilities stochastic integration sample under starting pars, needed for importance correction
 	.Object@pSI = apply(.Object@sim, 2, function(r)plausDensity(model, r, lp, parAncil));
-print(df2LRmatrix(Df(y = .Object@y, x = .Object@mm[, -1])));
-print(c(Nweights = sum(weights >= weight), weight = weight, par = .Object@mdl0$par, parAlt = plausFitAlt(model, .Object@y, mm1)$par), lp = c(lp[1:5], lp[201:205]));
+	#print(df2LRmatrix(Df(y = .Object@y, x = .Object@mm[, -1])));
+	#print(c(Nweights = sum(weights >= weight), weight = weight, par = .Object@mdl0$par, parAlt = plausFitAlt(model, .Object@y, mm1)$par), lp = c(lp[1:5], lp[201:205]));
 	#print(list(N = sum(weights > weight), ll = .Object@pSI));
 	return(.Object);
 });
