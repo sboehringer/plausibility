@@ -8,15 +8,17 @@ require('glmnet');
 #	<p> helper functions
 #
 
-plausibilityGlmnetLambda = function(y, mm0, X, model,
-	NlambdaSel = 10, nfolds = 20, lambdaKey = 'lambda.min') {
+#lambdaKey %in% c('lambda.min', 'lambda.1se')
+
+plausibilityGlmnetLambda = function(y, mm0, X, model, alpha,
+	NlambdaSel = 10, nfolds = 20, lambdaKey = 'lambda.1se') {
 	# <p> create offset
 	m0 = plausFit(model, y, mm0);
 	lp0 =  (mm0 %*% m0$par)[, 1];
 
 	# <p. select lambda
 	lambdas = list.kpu(lapply(1:NlambdaSel, function(i) {
-		cv.glmnet(X, y, offset = lp0, family = model@family, nfolds = nfolds, standardize = FALSE);
+		cv.glmnet(X, y, offset = lp0, family = model@family, alpha = alpha, nfolds = nfolds, standardize = FALSE);
 	}), lambdaKey);	# %in% c('lambda.min', 'lambda.min')
 	#print(stem(lambdas));
 	lambda = median(lambdas);
@@ -67,7 +69,7 @@ setClass("plausibilityPenalized", contains = 'plausibilityFamilyWeightedSI', rep
 setMethod('initialize', 'plausibilityPenalized', function(.Object, f0, f1, data, X, Nsi = 1e3, model,
 	start = NULL, objectiveFunction = cumProbSIcomp, sim = NULL, NmaxIS = 5,
 	weightingFunction = weightingFunctionLRpenalized, sampleFromAlt = TRUE, lp = NULL, fudge = NULL,
-	NlambdaSel = 1e1, Nfolds = 10, standardize = TRUE, alpha = 0) {
+	NlambdaSel = 1e1, Nfolds = 10, standardize = TRUE, alpha = .5) {
 
 	# <p> initialize
 	#	f1 used to complete data, here: alternative given as matrix X
@@ -80,7 +82,7 @@ setMethod('initialize', 'plausibilityPenalized', function(.Object, f0, f1, data,
 	#modelNm = Sprintf('plausibilityModel%{family}s');
 	.Object@model = model;
 	.Object@mdl0 = plausFit(model, .Object@y, .Object@mm);
-	.Object@lambda = plausibilityGlmnetLambda(.Object@y, .Object@mm, X, model, NlambdaSel, Nfolds);
+	.Object@lambda = plausibilityGlmnetLambda(.Object@y, .Object@mm, X, model, alpha, NlambdaSel, Nfolds);
 	#print(list(lambda = .Object@lambda));
 
 	lp0 =  (.Object@mm %*% .Object@mdl0$par)[, 1];

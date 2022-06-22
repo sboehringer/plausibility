@@ -445,7 +445,7 @@ handleTriggers = function(o, triggerDefinition = NULL) {
 		waitOption = if (is.null(waitForJids)) '' else
 			sprintf('--waitForJids %s', join(waitForJids, sep = ','));
 		message(cmd);
-		ncmd = sprintf('qsub.pl --jidReplace %s %s --unquote %s -- %s',
+		ncmd = sprintf('qsub.pl --type ogs --jidReplace %s %s --unquote %s -- %s',
 			jidFile, waitOption, qsubOptions, qs(cmd));
 		message(ncmd);
 		spec = list(cmd = ncmd, jidFile = jidFile);
@@ -453,7 +453,24 @@ handleTriggers = function(o, triggerDefinition = NULL) {
 	},
 	post = function(spec, ret, ...) { list(jid = as.integer(spec$fs$readFile(spec$jidFile))) }
 	),
-	
+
+	qsub_slurm = list(pre = function(cmd, spec,
+		jidFile = spec$fs$tempfile(sprintf('/tmp/R_%s/qsub_pattern', Sys.getenv('USER'))),
+		qsubOptions = '',
+		waitForJids = NULL, ...) {
+		Dir.create(jidFile, treatPathAsFile = TRUE);
+		waitOption = if (is.null(waitForJids)) '' else
+			sprintf('--waitForJids %s', join(waitForJids, sep = ','));
+		message(cmd);
+		ncmd = sprintf('qsub.pl --type slurm --jidReplace %s %s --unquote %s -- %s',
+			jidFile, waitOption, qsubOptions, qs(cmd));
+		message(ncmd);
+		spec = list(cmd = ncmd, jidFile = jidFile);
+		spec
+	},
+	post = function(spec, ret, ...) { list(jid = as.integer(spec$fs$readFile(spec$jidFile))) }
+	),
+
 	cwd = list(pre = function(cmd, spec, cwd = '.', ...) {
 		ncmd = sprintf('cd %s ; %s', qs(cwd), cmd);
 		spec = list(cmd = ncmd);
@@ -624,6 +641,20 @@ SourceLocal = function(file, ...,
 		file0 = file.locate(file, prefixes = locations);
 			if (notE(envir)) sys.source(file = file0, envir = envir, ...) else source(file = file0, ...)
 	})
+}
+
+# on the fly activation of package w/o installation
+#	SourcePackage('~/src/Rprivate/Packages/plausibility/plausibility.R');
+SourcePackage = function(defFile, ...,
+	locations = c('', '.', sprintf('%s/src/Rscripts', Sys.getenv('HOME'))),
+	envir = NULL) {
+
+	dir = splitPath(defFile)$dir;
+	tmpEnv = new.env();
+	SourceLocal(defFile, locations = locations, envir = tmpEnv);
+	files = c(defFile, get('packageDefinition', tmpEnv)$files);
+
+	SourceLocal(files, locations = c(dir, locations), envir = envir);
 }
 
 
@@ -918,13 +949,16 @@ pathSimplify = function(p)gsub('[:]', '_', p)
 pathInsertPostfix = function(path, postfix, sep = '-')
 	Sprintf('%{fullbase}s%{sep}s%{postfix}s.%{ext}s', splitPath(path))
 
+# keys of input-list are folder names, use folderstring in key to create subfolders
 # 	createZip(list(results = c('r/ref1.html', 'r/ref2.html')), 'r/myZip.zip', doCopy = TRUE);
+# 	createZip(list(`results::sub` = c('r/ref1.html', 'r/ref2.html')), 'r/myZip.zip', doCopy = TRUE);
 
 createZip = function(input, output, pword, doCopy = FALSE, readmeText, readme, logOnly = FALSE,
-	absoluteSymlink = FALSE, simplifyFileNames = FALSE) {
+	absoluteSymlink = FALSE, simplifyFileNames = FALSE, folderString = '::') {
 	destDir = splitPath(output)$fullbase;
 	Dir.create(destDir);
 	nelapply(input, function(n, e) {
+		if (notE(folderString)) n = gsub(folderString, '/', n);
 		subdir = join(c(destDir, n, ''), '/');
 		Dir.create(subdir);
 		toFiles = list.kpu(SplitPath(e), 'file');

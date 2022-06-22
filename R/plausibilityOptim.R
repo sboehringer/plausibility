@@ -261,3 +261,17 @@ findRegion = function(f, fixed, range = c(-5, 5), Ngrid = 1e3, sel = function(x,
 	Iregion = which(sel(y));
 	return(list(lower = rng[min(Iregion)], upper = rng[max(Iregion)]));
 }
+
+# create union of region across dimensions dims
+# assume array for lower/upper bound
+# min/max over non-marginalized dimensions coordinate-wise
+collapseRegion = function(region, dims) {
+	Ivar = which(is.na(fixed));
+	rng = seq(range[1], range[2], length.out = Ngrid);
+	m = matrix(rep(fixed, length(rng)), ncol = length(fixed), byrow = T);
+	m[, Ivar] = rng;
+	y = apply(m, 1, f);
+	Iregion = which(sel(y));
+	return(list(lower = rng[min(Iregion)], upper = rng[max(Iregion)]));
+}
+

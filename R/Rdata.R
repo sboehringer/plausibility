@@ -32,7 +32,7 @@ firstDef = function(..., .fdInterpolate = FALSE, .fdIgnoreErrors = FALSE, .fdE =
 }
 FirstDef = function(..., .fdInterpolate = FALSE, .fdIgnoreErrors = FALSE, .fdE = TRUE)
 	firstDef(..., .fdInterpolate = .fdInterpolate, .fdIgnoreErrors = .fdIgnoreErrors, .fdE = .fdE)
-firstDefNA = function(..., .fdInterpolate = FALSE){
+firstDefNA = function(..., .fdInterpolate = FALSE) {
 	l = if (.fdInterpolate) c(...) else list(...);
 	for (i in l) { if (!is.na(i)) return(i)};
 	NULL
@@ -47,14 +47,16 @@ to.list = function(..., .remove.factors = TRUE){
 }
 # clean list/vector
 Avu = function(v)as.vector(unlist(v))
+is.Null = nullOrLengthNull = function(e)(is.null(e) || length(e) == 0);
 # pretty much force everything to be a vector
+# toNA: length(0) or NULL converted to NA
 avu = function(v, recursive = TRUE, toNA = TRUE) {
 	transform = if (toNA)
 		function(e, condition)(if (condition) NA else avu(e, toNA = TRUE, recursive = TRUE)) else
 		function(e, ...)avu(e, toNA = FALSE, recursive = TRUE);
 
 	r = if (is.list(v)) {
-		nls = sapply(v, is.null);	# detects nulls
+		nls = sapply(v, is.Null);	# detects nulls
 		# unlist removes NULL values -> NA
 		unlist(sapply(seq_along(v), function(i)transform(v[[i]], nls[i])));
 	} else as.vector(v);
@@ -1043,7 +1045,7 @@ merge.lists = function(..., ignore.nulls = TRUE, listOfLists = FALSE, concat = F
 	l1
 }
 
-merge.lists.recursive = function(..., ignore.nulls = TRUE, listOfLists = FALSE) {
+merge.lists.recursive = function(..., ignore.nulls = TRUE, listOfLists = FALSE, concat = FALSE) {
 	lists = if (listOfLists) c(...) else list(...);
 	l1 = lists[[1]];
 	if (length(lists) > 1) for (i in 2:length(lists)) {
@@ -1053,7 +1055,7 @@ merge.lists.recursive = function(..., ignore.nulls = TRUE, listOfLists = FALSE) 
 			if (!is.null(n) & (!ignore.nulls | !is.null(l2[[n]])))
 				l1[[n]] = if (is.list(l1[[n]]))
 					merge.lists.recursive(l1[[n]], l2[[n]]) else
-					l2[[n]]
+					(if (concat) c(l1[[n]], l2[[n]]) else l2[[n]])
 		}
 	}
 	l1
@@ -1332,14 +1334,15 @@ listReverseHierarchy = function(l, unlist = FALSE) {
 
 # return pair of lists: keys to access element, value
 list.flatten_raw = function(lol, prefix = list(), ignoreIndeces = TRUE) {
-	ns = names(lol);
-	if (is.null(ns)) ns = 1:length(lol);
-	r = unlist.n(lapply(ns, function(n) {
+	#ns = names(lol);
+	#if (is.null(ns)) ns = 1:length(lol);
+	# <A> duplicate names, handled by nelapply
+	r = unlist.n(Nelapply(lol, function(n, e) {
 		# generate list of lists, each entry being list(key path), value
-		if (is.list(lol[[n]])) {
+		if (is.list(e)) {
 			prefix = if (ignoreIndeces && is.integer(n)) prefix else c(prefix, list(n));
-			list.flatten_raw(lol[[n]], prefix = prefix)
-		} else list(list(c(prefix, list(n)), lol[[n]]));
+			list.flatten_raw(e, prefix = prefix)
+		} else list(list(c(prefix, list(n)), e));
 	}), 1);
 	return(r);
 }
@@ -1352,7 +1355,7 @@ list.flatten = function(lol, joinby = NULL, aspairs = TRUE, ignoreIndeces = TRUE
 	keys = list.kp(r, '[[1]]');
 	values = list.kp(r, '[[2]]');
 	if (is.null(joinby)) return(list(keys = keys, values = values));
-	return(listKeyValue(sapply(list.kp(r, '[[1]]'), join, sep = joinby), values));
+	return(listKeyValue(sapply(keys, join, sep = joinby), values));
 }
 
 
@@ -1430,13 +1433,14 @@ nlapply = function(ns, f, ...) {
 	names(r) = ns;
 	r
 }
-nelapply = function(l, f, ...) {
+nelapply = function(l, f, ..., name = '') {
 	ns = names(l);
-	if (is.null(ns)) ns = rep('', length(l));
+	if (is.null(ns)) ns = ( if (notE(name)) rep(name, length(l)) else seq_along(l) );
 	r = lapply(seq_along(l), function(i, ...)f(ns[i], l[[i]], ...), ...);
 	names(r) = ns;
 	r
 }
+Nelapply = function(l, f, ..., name = NULL)nelapply(l, f, ..., name = name)
 
 ilapply = function(l, f, ...) {
 	r = lapply(1:length(l), function(i)f(l[[i]], i, ...));
@@ -1512,12 +1516,13 @@ dfapply = function(Df__, f__) {
 	return(Dfr);
 }
 
-filterList = function(o, f, ...) {
-	l = sapply(o, f, ...);
+list.grep = sublist = filterList = function(o, f, ...) {
+	l = if (!is.function(f)) f else sapply(o, f, ...);
 	if (length(l) == 0) l = NULL;	#list corner case
 	r = o[l];
 	return(r);
 }
+
 
 
 # <i> copy MARGIN handling from apply (aperm)
@@ -1863,11 +1868,26 @@ searchDataFrame = function(d, l, .remove.factors = TRUE) {
 	rs
 }
 
+Which.cols = function(d, cols, regex = FALSE) {
+	which.indeces(cols[is.character(cols)], names(d), regex = regex)
+}
 .df.cols = which.cols = function(d, cols, regex = FALSE) {
 	cols[is.numeric(cols)] = as.integer(cols[is.numeric(cols)]);
 	cols[is.character(cols)] = which.indeces(cols[is.character(cols)], names(d), regex = regex);
 	as.integer(cols)
 }
+DfColsAfter = function(d, col, regex = FALSE, inclusive = FALSE) {
+	I = which.cols(d, col, regex = regex);
+	if (is.null(I)) return(NULL);
+	return( (I + ifelse(inclusive, 0, 1)):ncol(d));
+}
+DfColsBetween = function(d, col1, col2, regex = FALSE, inclusive = TRUE) {
+	I1 = if (missing(col1)) 1 else which.cols(d, col1, regex = regex);
+	I2 = if (missing(col2)) ncol(d) else which.cols(d, col2, regex = regex);
+	if (is.null(I1) || is.null(I2)) return(NULL);
+	return( (I1 + ifelse(inclusive, 0, 1)):(I2 + ifelse(inclusive, 0, -1)) );
+}
+
 # select columns by name
 .df = function(d, names, regex = TRUE, as.matrix = FALSE) {
 	cols = which.indeces(names, names(d), regex = regex);
@@ -2270,9 +2290,14 @@ table.n = function(v, n, min = 1, categories = NULL) {
 	t = as.vector(table(c(categories, v)) - rep(1, length(categories)));
 	t
 }
-table.freq = function(v) {
+
+tableFreqMarg = function(tab, margin = 2)apply(as.matrix(tab), margin, vn)
+
+table.freq = function(v, byCol = TRUE) {
 	t0 = table(v);
-	r = t0 / sum(t0);
+	r = if (is.vector(v) || is.factor(v) || is.numeric(v) || ncol(v) == 1) { t0 / sum(t0) } else {
+		if (byCol) tableFreqMarg(t0) else tableFreqMarg(t0, 1)
+	}
 	r
 }
 table.n.freq = function(...) {
@@ -2561,6 +2586,10 @@ DfRound = function(df0, cols_round = names(df0), digits = 2, as_numeric = FALSE)
 
 
 # standardize df names using formulas
+# f: formula with names used in the Dataframe ~ x1 + x2 ... or x1 ~ x2 + ...
+#	corresponding positionally to the standard names
+# nmsStd: formula or vector with standard names
+# d: data.frame with column names tb transformed
 dfNmsStd = function(f, nmsStd, d) {
 	nmsUsed = all.vars(f);
 	#if (is.formula(nmsStd)) nmsStd = all.vars(nmsStd);
@@ -2880,6 +2909,8 @@ recodeLevels = function(f, map = NULL, others2na = TRUE, levels = NULL, setLevel
 	}
 	r
 }
+levelsSort = function(fac)recodeLevels(fac, listKeyValue(sort(levels(fac)), sort(levels(fac))))
+
 
 factor2int = function(f)as.integer(as.character(f))
 factor2numeric = function(f)as.numeric(as.character(f))
@@ -3425,6 +3456,12 @@ Merge = function(x, y, by = intersect(names(x), names(y)), ..., safemerge = TRUE
 	r
 }
 
+MergeByRowNanmes = function(x, y, ...) {
+	dMerge = Merge(Df(x, ROW_NAMES__ = row.names(x)), Df(y, ROW_NAMES__ = row.names(y)),
+		by = 'ROW_NAMES__', ...)
+	Df_(dMerge, min_ = 'ROW_NAMES__', row.names = dMerge$ROW_NAMES__)
+}
+
 # ids: variables identifying rows in final table
 # vars: each combination of vars gets transformed to an own column
 # <!> not tested for length(ids) > 1 || ength(rvars) > 1
@@ -3667,6 +3704,25 @@ Reshape.long.byParts = function(d, ..., N = 1e4, path = tempfile(), filter = NUL
 	return(readTable(Sprintf('[SEP=S,HEADER=T]:%{path}s')));
 }
 
+byParts = function(d, fn, ..., N = 1e4, path = tempfile(), filter = NULL) {
+	Nrow = nrow(d);
+	Nparts = ceiling(Nrow / N);
+
+	#Nparts = 2;
+	for (i in 1:Nparts) {
+		dP = d[ (N*(i - 1) + 1):min((N*i), Nrow), ];
+		dL = fn(dP, ...);
+		if (notE(filter)) dL = filter(dL);
+		write.table(apply(dL, 2, as.character), file = path, col.names = i == 1, append = i != 1, row.names = F);
+	}
+	gc();
+	return(readTable(Sprintf('[SEP=S,HEADER=T]:%{path}s')));
+}
+
+reshape.long.byParts = function(d, ..., N = 1e4, path = tempfile(), filter = NULL) {
+	byParts(d, reshape.long, ..., N = N, path = path, filter = filter);
+}
+
 #
 # <p> string functions
 #
@@ -3690,6 +3746,11 @@ deduplicateLabels = function(v, labels = v[duplicated(v)], sep = '-', firstUntou
 }
 
 Trimws = function(s)join(sub('^\t', '', splitString("\n", s)), '\n');
+
+# non-empty string
+nonEmpty = function(e)nif(e != '')
+# non-empty, unique
+vecCharNEU = function(v)unique(Filter(nonEmpty, v))
 
 #
 #	<p> factor transformations for data frames
@@ -3942,6 +4003,7 @@ dataSelectCols = function(data, prefix, fixed = ~ 0) {
 
 
 formula.add.rhs = function(f0, f1, envir = parent.frame()) {
+	if (is.character(f1)) f1 = as.formula(paste0(c('~', paste(f1, collapse = ' + ')), collapse = ''));
 	as.formula(join(c(
 		formula.to.character(f0),
 		formula.rhs(f1, noTilde = TRUE, as_character = TRUE)), '+'), env = envir)

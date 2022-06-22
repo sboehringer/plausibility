@@ -906,8 +906,9 @@ alphaLevels = function(ps, Nalpha = 40, alphas = seq(1/Nalpha, 1 - 1/Nalpha, len
 	lvls
 }
 
-testSizes = function(ps, levels = seq(0, 1, length.out = 21), asDf = FALSE, scale = 1, round = NULL) {
+testSizes = function(ps, levels = seq(0, 1, length.out = 21), asDf = FALSE, scale = 1, round = NULL, diff = FALSE) {
 	sizes = sapply(levels, function(l) fraction(ps <= l));
+	if (diff) sizes = sizes - levels;
 	r = if (asDf)
 		Df(level = levels, size = sizes) else
 		SetNames(sizes, Sprintf("%{l}.1f%%", l = levels*100));
@@ -917,6 +918,7 @@ testSizes = function(ps, levels = seq(0, 1, length.out = 21), asDf = FALSE, scal
 }
 TestSizes = function(ps, levels = seq(0, 1, length.out = 21), asDf = FALSE, scale = 100, round = 2)
 	testSizes(ps, levels, asDf, scale, round)
+
 testSizePlot = function(ps, ..., diagonal = 'red') {
 	psP = testSizes(ps, ..., asDf = TRUE);
 	ggplot(psP, aes(x = levels, y = size)) + geom_line() +
@@ -978,7 +980,7 @@ ciToP = function(ci.lo, ci.up, level = .95, one.sided = F, against = 0) {
 	P
 }
 # convert point estimate and SD to p-value (assuming normality)
-peSdToP = function(beta, sd, one.sided = F) {
+betaSe2P = peSdToP = function(beta, sd, one.sided = F) {
 	pnorm(-abs(beta), 0, sd, lower.tail = T) * ifelse(one.sided, 1, 2);
 }
 
@@ -1946,29 +1948,105 @@ Floor = function(x, N = 0)(floor(x * 10^N) / 10^N)
 #
 
 SummaryColNum = function(col, qtls = c(0, 0.25, .5, .75, 1)) {
-	qs = quantile(col, qtls, na.rm = T);
-	mn = vector.named(mean(col, na.rm = T), 'mean');
-	na = vector.named(fraction(is.na(col)), 'NA');
-	Sd = vector.named(sd(col, na.rm = T), 'sd');
-	medianI = which(qtls == .5);
-	qs1 = if (length(medianI) > 0) vector.embed(qs, medianI + 1, mn) else c(qs, mean);
-	c(qs1, Sd, na)
+	qAlways = c(0, .25, .5, .75, 1);
+	Qtls = sort(unique(c(qAlways, qtls)));
+	qs = quantile(col, Qtls, na.rm = TRUE);
+	mn = mean(col, na.rm = T);
+	na = fraction(is.na(col));
+	Sd = sd(col, na.rm = T);
+	median = qs[which(qtls == .5)];
+	qs1 = qs[which.indeces(setdiff(Qtls, qAlways), Qtls)]
+	N = sum(!is.na(col));
+	vs = c(mn, Sd, N, na, median,
+		qs[which(qtls == .25)], qs[which(qtls == .75)],
+		qs[which(qtls == 0)], qs[which(qtls == 1)], qs1);
+	r = Df_(t(vs),
+		names = c('mean', 'sd', 'N', 'NA', 'median', 'Q25', 'Q75', 'min', 'max', names(qs1)),
+		row.names = attr(col, 'label'));
+	return(r);
 }
 SummaryColFactor = function(col) {
 	na = vector.named(fraction(is.na(col)), 'NA');
 	na
 }
+SummaryCatCol = function(col) {
+	if (class(col) != 'factor') return(NULL);
+	tc = t2r(table(col))[, 1];
+	N = sum(tc)
+	rn = paste(attr(col, 'label'), names(tc), sep = '.');
+	#rn = names(tc);
+	ns = c('mean', 'sd', 'N', 'NA');
+	rTot = Df(NA, NA, N, mean(is.na(col)), row.names = attr(col, 'label'), names = ns);
+	#rTot = Df(NA, NA, N, mean(is.na(col)), names = ns);
+	freq = tc / N;
+	sd = sqrt(freq * (1 - freq) / N);
+	rLev = Df(freq, sd, tc, NA, row.names = rn, names = ns)
+	r = rbind(rTot, rLev);
+	r
+}
+
 SummaryCol = function(col, qtls = c(0, 0.25, .5, .75, 1)) {
 	r = if (class(col) == 'numeric') SummaryColNum(col, qtls) else
-		if (class(col) == 'factor') c(rep(NA, length(qtls) + 2), SummaryColFactor(col)) else
+		if (class(col) == 'factor') SummaryCatCol(col) else
 			stop("Could not summarize column");
 	r
 }
 
+DfLabel = function(d) {
+	return(Df(nelapply(d, function(n, col) {
+		attr(col, 'label') = n;
+		return(col);
+	})));
+}
+
 Summary = function(d) {
-	r0 = lapply(d, SummaryCol)
-	r = t(as.matrix(do.call(cbind, r0)));
+	r0 = lapply(DfLabel(d), SummaryCol)
+	r1 = RbindDfs(SetNames(r0, NULL), embed = TRUE);
+	return(r1);
+}
+
+
+# summary of categorical data
+SummaryCat = function(d) {
+	r0 = lapply(DfLabel(d), SummaryCatCol)
+	r = do.call(rbind, r0);
+	row.names(r) = NULL
 	r
+}
+
+SummaryTestCat = function(col, By, B = 1e4) {
+	catTab = table(Df(col, By));
+	P = chisq.test(catTab)$p.value;
+	PnonPar = chisq.test(catTab, B = 1e4)$p.value;
+	return(Df(P = P, PnonPar = PnonPar, row.names = attr(col, 'label')));
+}
+SummaryTestNum = function(col, By) {
+	#grps = by(col, By, identity);	# --> t test
+	rAnova = summary(aov(y ~ group, Df(y = col, group = By)));
+	P = rAnova[[1]]['group', 'Pr(>F)'];
+	PnonPar = kruskal.test(col, By)$p.value;
+	return(Df(P = P, PnonPar = PnonPar, row.names = attr(col, 'label')));
+}
+
+SummaryTest = function(col, by) {
+	r = if (class(col) == 'numeric') SummaryTestNum(col, by) else
+		if (class(col) == 'factor') SummaryTestCat(col, by) else
+			stop("Could not summarize column");
+	r
+}
+
+SummaryBy = function(d, By, summaryVars) {
+	d = DfLabel(d);
+	if (missing(summaryVars)) summaryVars = setdiff(names(d), By);
+	r = by(d, d[[By]], function(d0) {
+		Summary(d0[, summaryVars, drop = F])
+	});
+	r = c(list(all = Summary(Df_(d, min_ = By))), r);
+	tests = lapply(summaryVars, function(n)SummaryTest(d[[n]], d[[By]]));
+	dfTests = do.call(rbind, tests);
+	tab = do.call(cbind, r);
+	tabTests = MergeByRowNanmes(tab, dfTests, all = TRUE);
+	return(list(tab = tab, tabsBy = r, tabTests = tabTests, test = dfTests));
 }
 
 
@@ -2137,16 +2215,21 @@ totalDeriv = function(f, x, ..., eps = 1e-5) {
 	t(sapply(seq_along(y), function(i)gradient(function(x)f(x, ...)[i], x, eps = eps)));
 }
 
-# delta rule for functions of binomial data
-#N: list of pairs Nevents, Ntotal, or nx2 matrix of these numbers
-#f: function to be computed on the frequencies
-deltaFreqs = function(N, f, logScale = T, ..., eps = 1e-5, alpha = .95, pseudo = 0) {
-	#if (is.list(N)) N = sapply(N, identity);
+deltaNPseudo = function(N, pseudo = 0) {
 	if (is.list(N)) N = do.call(cbind, N);
 	if (pseudo != 0) {
 		N[1, ] = N[1, ] + pseudo;
 		N[2, ] = N[2, ] + 2*pseudo;
 	}
+	return(N);
+}
+
+# delta rule for functions of binomial data
+#N: list of pairs Nevents, Ntotal, or nx2 matrix of these numbers
+#f: function to be computed on the frequencies
+deltaFreqs = function(N, f, logScale = T, ..., eps = 1e-5, alpha = .95, pseudo = 0) {
+	#if (is.list(N)) N = sapply(N, identity);
+	N = deltaNPseudo(N, pseudo);
 	freqs = N[1, ] / N[2, ];
 	var = freqs * (1 - freqs) / N[2, ];
 
@@ -2202,6 +2285,8 @@ deltaCompose = function(parCov) {
 
 
 # assume TRUE/FALSE
+# tab = Table(list(pred = prob >= co, truth = labels), cats = list(pred = c(F, T), truth = c(F, T)))
+# Table(list(pred = c(T, F, T, F), truth = c(T, T, F, F)), cats = list(pred = c(F, T), truth = c(F, T)))
 binaryMeasure = function(tab, strict = TRUE) {
 	if (strict && !all(names(dimnames(tab)) == c('pred', 'truth'))) stop('dimnames != pred, truth');
 	if (strict && !all(unique(unlist(dimnames(tab))) == c('FALSE', 'TRUE'))) stop('values != FALSE, TRUE');

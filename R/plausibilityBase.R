@@ -148,36 +148,8 @@ setMethod('plausibility', 'plausibilityFamily',
 });
 
 #
-#	<p> region
-#
-
-setMethod('region', 'plausibilityFamily',
-	function(this, start, level = .95, ...) {
-
-	# search aroudn 3 SDs for a level of .95
-	# <i> calibrate to level
-	mn = this@mdl0$par[this@mdl0$parsFree];
-	delta = 3 * this@mdl0$sds[this@mdl0$parsFree];
-	print(c(mn, delta));
-	fa = approximateFunctionFor(this@objectiveFunction, mn - delta, mn + delta,
-		Ngrid = 7, conditions = conditionsContour(contour = 1 - level),
-		this = this
-	);
-	fx = approximated(fa, Nnn = 2, aggr = max);
-	ci = findRegion(fx, fixed = rep(NA, ncol(fa) - 1), sel = function(x, contour = 1 - level)x < contour);
-
-	return(list(region = ci, fa = fa));
-});
-
-#
 #	<p> internal interface
 #
-
-RegionBinomial = function(f0, data, Nsi = 1e3L, Niter = 1L, ..., optMethod = 'grid', level = .95) {
-	rPl = PlausibilityBinomial(f0, data, Nsi = Nsi, Niter = Niter, ..., optMethod = optMethod);
-	plRegion = region(rPl@object, start = rPl@start, level = level);
-	return(plRegion);
-}
 
 PlausibilityUnweighted = function(f0, data, family,
 	Nsi = 1e3L, Niter = 1L, optMethod, ...) {
@@ -223,12 +195,44 @@ PlausibilityWeighted = function(f0, f1 = NULL, data, family,
 	return(rPl);
 }
 
+#
+#	<p> plausibility region
+#
+
+setMethod('region', 'plausibilityFamily',
+	function(this, start = NULL, level = .95, Napprox = 5, ...) {
+
+	# search aroudn 3 SDs for a level of .95
+	# <i> calibrate to level
+	mn = if (is.null(start)) this@mdl0$par else start;
+	delta = 3 * this@mdl0$sds
+	ranges = apply(cbind(mn - delta, mn + delta), 1, identity, simplify =- F);	# list fo ranges
+
+	cls = contourLinesStacked(ranges, Napprox, this@objectiveFunction);
+	contour = completeLevelSets(cls, contour = 1 - level);
+
+	return(list(region = contour));
+});
+
+PlausibilityRegionFull = function(f0, data, family = 'gaussian', level = .95, Nsi = 1e3L, Niter = 1L, ..., optMethod = 'grid', plClass = 'plausibilityGlm', initArgs = list()) {
+	modelNm = Sprintf('plausibilityModel%{family}u');
+	model = new(modelNm, family = family, ...);
+	Data = completeData(f0, data);
+
+	args = merge.lists(
+		list(f0 = f0, data = Data, Nsi = Nsi, model = model),
+		initArgs);
+	pl = do.call('new', c(list(Class = plClass), args));
+
+	plRegion = region(pl, start = NULL, optMethod = optMethod);
+	return(plRegion);
+}
 
 #
 #	<p> external interface
 #
 
-#' Compute weighted plausibility for a model comparison of binomial outcome
+#' Compute weighted or unweighted plausibility function
 #'
 #' A model comparison of binomial outcome for nested models is computed. The plausibility estimate and P-value are returned together with a glm-fit.
 #'
@@ -238,7 +242,6 @@ PlausibilityWeighted = function(f0, f1 = NULL, data, family,
 #' @param optMethod Optimization method to use. Either 'grid' (default) or 'optim'
 #' @param Niter Number of iterations used when finding the plausibility estimate
 #' @param Nsi Number of stochastic integration samples (defaults to 1e3L)
-#' @param Nbinom Number of repetions in the binomial outcome
 #' @param ... Arguments passed to the optimizer
 #'
 #' @export Plausibility
@@ -249,5 +252,30 @@ Plausibility = function(f0, f1 = NULL, data, family = 'binomial',
 		PlausibilityWeighted(f0, f1, data, family, Nsi, Niter, optMethod, ...,
 			plClass = plClass, initArgs = initArgs) else
 		PlausibilityUnweighted(f0, data, family, Nsi, Niter, optMethod, ...);
+	return(rPl);
+}
+
+
+#' Compute full or marginal plausibility region
+#'
+#' glm-fit.
+#'
+#' @param f0 Null model given as R formula
+#' @param f1 optional formula containing variables to be marginalized over
+#' @param data data frame
+#' @param optMethod Optimization method to use. Either 'grid' (default) or 'optim'
+#' @param Niter Number of iterations used when finding the plausibility estimate
+#' @param Nsi Number of stochastic integration samples (defaults to 1e3L)
+#' @param ... Arguments passed to the optimizer
+#'
+#' @export Plausibility
+PlausibilityRegion = function(f0, f1 = NULL, data, family = 'binomial', level = .95,
+	Nsi = 1e3L, Niter = 1L, optMethod = 'optim', ..., plClass = 'plausibilityGlm', initArgs = list()) {
+
+	rPl = if (notE(f1))
+		PlausibilityRegionMarginal(f0, f1, data, family, Nsi, Niter, optMethod, ...,
+			plClass = plClass, initArgs = initArgs) else
+		PlausibilityRegionFull(f0, data, family, level, Nsi, Niter, optMethod = optMethod, ...,
+			plClass = plClass, initArgs = initArgs);
 	return(rPl);
 }
