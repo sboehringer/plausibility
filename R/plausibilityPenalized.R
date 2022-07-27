@@ -18,7 +18,7 @@ foldIds = function(N, Nfolds, doSample = TRUE) {
 #lambdaKey %in% c('lambda.min', 'lambda.1se')
 
 lambdaAlphaSelect = function(X, y, lp0, model, NlambdaSel, nfolds, lambdaKey, alphaSel) {
-	foldids = sapply(1:NlambdaSel, \(.) foldIds(nrow(X), nfolds));
+	foldids = sapply(1:NlambdaSel, function(.) foldIds(nrow(X), nfolds));
 	ns = c('lambda', 'mse');
 	lambdaAlpha = lapply(alphaSel, function(alpha) {
 		lambdas = lapply(1:NlambdaSel, \(i) {
