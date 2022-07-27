@@ -952,6 +952,7 @@ pathInsertPostfix = function(path, postfix, sep = '-')
 # keys of input-list are folder names, use folderstring in key to create subfolders
 # 	createZip(list(results = c('r/ref1.html', 'r/ref2.html')), 'r/myZip.zip', doCopy = TRUE);
 # 	createZip(list(`results::sub` = c('r/ref1.html', 'r/ref2.html')), 'r/myZip.zip', doCopy = TRUE);
+#	values are slash-dependend dest = 'source' copies into dest/source; dest = source/, copies into dest
 
 createZip = function(input, output, pword, doCopy = FALSE, readmeText, readme, logOnly = FALSE,
 	absoluteSymlink = FALSE, simplifyFileNames = FALSE, folderString = '::') {
@@ -964,7 +965,8 @@ createZip = function(input, output, pword, doCopy = FALSE, readmeText, readme, l
 		toFiles = list.kpu(SplitPath(e), 'file');
 		if (simplifyFileNames) toFiles = sapply(toFiles, pathSimplify);
 		to = paste(subdir, toFiles, sep = '/');
-		if (doCopy) file.copy(e, to) else {
+		LogS(4, 'Copy: %{e}s --> %{to}s');
+		if (doCopy) file.copy(e, to, recursive = TRUE) else {
 			#from = relativePath(subdir, e);
 			from = absolutePath(e);
 			if (absoluteSymlink) from = NormalizePath(paste(splitPath(subdir)$absolute, from, sep = '/'));

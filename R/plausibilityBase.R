@@ -200,18 +200,22 @@ PlausibilityWeighted = function(f0, f1 = NULL, data, family,
 #
 
 setMethod('region', 'plausibilityFamily',
-	function(this, start = NULL, level = .95, Napprox = 5, ...) {
+	function(this, start = NULL, level = .95, Napprox = 20, ..., Nretries = 2, deltaFact = 3) {
 
 	# search aroudn 3 SDs for a level of .95
 	# <i> calibrate to level
 	mn = if (is.null(start)) this@mdl0$par else start;
-	delta = 3 * this@mdl0$sds
-	ranges = apply(cbind(mn - delta, mn + delta), 1, identity, simplify =- F);	# list fo ranges
+	delta = deltaFact * this@mdl0$sds
+	for (i in 1:Nretries) {
+		ranges = apply(cbind(mn - delta, mn + delta), 1, identity, simplify =- F);	# list fo ranges
 
-	cls = contourLinesStacked(ranges, Napprox, this@objectiveFunction);
-	contour = completeLevelSets(cls, contour = 1 - level);
-
-	return(list(region = contour));
+		# 	cls = contourLinesStacked(ranges, Napprox, this@objectiveFunction);
+		# 	contour = completeLevelSets(cls, contour = 1 - level);
+		contour = try(FindRegion(this@objectiveFunction, ranges, level = level, Nout = Napprox, this = this));
+		if (!any(class(contour) == 'try-error')) return(list(region = contour));
+		delta = delta * deltaFact;
+	}
+	return(list(region = NA));
 });
 
 PlausibilityRegionFull = function(f0, data, family = 'gaussian', level = .95, Nsi = 1e3L, Niter = 1L, ..., optMethod = 'grid', plClass = 'plausibilityGlm', initArgs = list()) {

@@ -8,21 +8,60 @@ require('glmnet');
 #	<p> helper functions
 #
 
+foldIds = function(N, Nfolds, doSample = TRUE) {
+	ids = if (doSample) sample(1:Nfolds) else 1:Nfolds;
+	Nfold = splitSeatsForFractions(N, vn(rep(1, Nfolds)));
+	foldIds = unlist(sapply(1:Nfolds, function(i)rep(ids[i], Nfold[i])));
+	return(if (doSample) sample(foldIds) else foldIds);
+}
+
 #lambdaKey %in% c('lambda.min', 'lambda.1se')
 
-plausibilityGlmnetLambda = function(y, mm0, X, model, alpha,
-	NlambdaSel = 10, nfolds = 20, lambdaKey = 'lambda.1se') {
+lambdaAlphaSelect = function(X, y, lp0, model, NlambdaSel, nfolds, lambdaKey, alphaSel) {
+	foldids = sapply(1:NlambdaSel, \(.) foldIds(nrow(X), nfolds));
+	ns = c('lambda', 'mse');
+	lambdaAlpha = lapply(alphaSel, function(alpha) {
+		lambdas = lapply(1:NlambdaSel, \(i) {
+			rGlmnet = cv.glmnet(X, y, offset = lp0, family = model@family,
+				alpha = alpha, foldids = foldids[, i], standardize = FALSE);
+			SetNames(c(rGlmnet[[lambdaKey]], mean(rGlmnet$cvm)), ns)
+		});
+	});
+	# alpha-lambda-mse
+	alm = aperm(array(unlist(lambdaAlpha), c(2, NlambdaSel, length(alphaSel))), c(2, 1, 3));
+	dimnames(alm) = list(NULL, ns, alphaSel);
+	# select lambda
+	lambdas = apply(alm, 3, \(m)m[which.min((m[, 'lambda'] - median(m[, 'lambda']))^2), , drop = F]);
+	dimnames(lambdas)[[1]] = ns;
+	# alpha + lambda
+	Ialpha = which.min(lambdas['mse', ]);
+	rAlpha = c(alpha = alphaSel[Ialpha], lambda = lambdas['lambda', Ialpha]);
+	return(rAlpha);
+}
+
+lambdaSelect = function(X, y, lp0, model, NlambdaSel, alpha, nfolds, lambdaKey) {
+	if (is.null(lp0)) lp0 = rep(0, length(y));
+	family = if (is.character(model)) model else model@family;
+	lambdas = list.kpu(lapply(1:NlambdaSel, function(i) {
+		cv.glmnet(X, y, offset = lp0, family = family, alpha = alpha, nfolds = nfolds, standardize = FALSE);
+	}), lambdaKey);	# %in% c('lambda.min', 'lambda.min')
+	lambda = median(lambdas);
+	return(c(alpha = alpha, lambda = lambda));
+}
+
+plausibilityGlmnetTuning = function(y, mm0, X, model, alpha,
+	NlambdaSel = 10, nfolds = 20, lambdaKey = 'lambda.1se', alphaSel = seq(0, 1, length.out = 11)) {
 	# <p> create offset
 	m0 = plausFit(model, y, mm0);
 	lp0 =  (mm0 %*% m0$par)[, 1];
 
-	# <p. select lambda
-	lambdas = list.kpu(lapply(1:NlambdaSel, function(i) {
-		cv.glmnet(X, y, offset = lp0, family = model@family, alpha = alpha, nfolds = nfolds, standardize = FALSE);
-	}), lambdaKey);	# %in% c('lambda.min', 'lambda.min')
-	#print(stem(lambdas));
-	lambda = median(lambdas);
-	return(lambda);
+	# <p. select tuning paramters
+	alphaLambda = if (is.na(alpha)) {
+		lambdaAlphaSelect(X, y, lp0, model, NlambdaSel, nfolds, lambdaKey, alphaSel);
+	} else {
+		lambdaSelect(X, y, lp0, model, alpha, nfolds, lambdaKey)
+	}
+	return(alphaLambda);
 }
 
 plausibilityPenalizedFit = function(y, X, family = 'gaussian', offset = NULL,
@@ -43,7 +82,7 @@ weightingFunctionLRpenalized = function(p, y, mm0, X, alpha) {
 	# <p> models
 	m0 = plausFit(model, y, mm0);
 	lp0 =  (mm0 %*% m0$par)[, 1];
-	m1 = plausibilityPenalizedFit(y, X, family = model@family, offset = lp0, lambda = p@lambda, alpha = alpha);
+	m1 = plausibilityPenalizedFit(y, X, family = model@family, offset = lp0, lambda = p@tuning['lambda'], alpha = p@tuning['alpha']);
 	#print(m1$beta);
 	ll1 = plausDensity(model, y, m1$lp, plausAncil(model, y, m1$lp))
 
@@ -63,8 +102,10 @@ setClass("plausibilityPenalized", contains = 'plausibilityFamilyWeightedSI', rep
 	sim = 'matrix',
 	weights = 'numeric',	# simulation weights
 	weight = 'numeric',		# data weight
-	lambda = 'numeric'		# penalty parameter
+	tuning = 'numeric'		# mixing, penalty parameter
 ), prototype = list());
+
+# alpha == NULL: perform model selection for alpha
 
 setMethod('initialize', 'plausibilityPenalized', function(.Object, f0, f1, data, X, Nsi = 1e3, model,
 	start = NULL, objectiveFunction = cumProbSIcomp, sim = NULL, NmaxIS = 5,
@@ -82,14 +123,14 @@ setMethod('initialize', 'plausibilityPenalized', function(.Object, f0, f1, data,
 	#modelNm = Sprintf('plausibilityModel%{family}s');
 	.Object@model = model;
 	.Object@mdl0 = plausFit(model, .Object@y, .Object@mm);
-	.Object@lambda = plausibilityGlmnetLambda(.Object@y, .Object@mm, X, model, alpha, NlambdaSel, Nfolds);
-	#print(list(lambda = .Object@lambda));
+	.Object@tuning = plausibilityGlmnetTuning(.Object@y, .Object@mm, X, model, alpha, NlambdaSel, Nfolds);
+	print(.Object@tuning);
 
 	lp0 =  (.Object@mm %*% .Object@mdl0$par)[, 1];
 	# <p> sampling from alternative
 	if (is.null(sim) && is.null(lp) && sampleFromAlt) {
 		lp = plausibilityPenalizedFit(.Object@y, X, model@family,
-			offset = lp0, lambda = .Object@lambda, alpha = alpha)$lp[, 1];
+			offset = lp0, lambda = .Object@tuning['lambda'], alpha = .Object@tuning['alpha'])$lp[, 1];
 	}
 
 	# <p> linear predictor
@@ -102,12 +143,11 @@ setMethod('initialize', 'plausibilityPenalized', function(.Object, f0, f1, data,
 			plausSample(model, u, lp, parAncil));
 
 	# <p> data weight
-	weight = weightingFunction(.Object, .Object@y, .Object@mm, X, alpha);
+	weight = weightingFunction(.Object, .Object@y, .Object@mm, X, .Object@tuning['alpha']);
 	# <p> simulation weights
-	weights = apply(sim, 2, function(y)weightingFunction(.Object, y, .Object@mm, X, alpha));
-
+	weights = apply(sim, 2, function(y)weightingFunction(.Object, y, .Object@mm, X, .Object@tuning['alpha']));
 	# filter simulation for required sub-sample
-	.Object@sim = sim[, weights > weight ];
+	.Object@sim = sim[, weights > weight, drop = FALSE];
 
 	# <p> probabilities stochastic integration sample under starting pars, needed for importance correction
 	.Object@pSI = apply(.Object@sim, 2, function(r)plausDensity(model, r, lp, parAncil));

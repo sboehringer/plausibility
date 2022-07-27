@@ -2462,3 +2462,29 @@ rbinomial = function(P, Nbinom = 1) {
 	P = t_(sapply(P, function(p)cumsum(dbinom(0:(Nbinom - 1), Nbinom, p))));
 	return(rmultinomial(P));
 }
+
+#
+#	<p> special data transformation
+#
+
+# partial long -> wide transformation by putting baseline value into separate column
+
+dataSplitBaseline = function(dataN, valueColumn = 'RATEHEALTHTODAY',
+	timeColumn = 'TIMINGASSDR1', baselineValue = 'Baseline', idColumn = 'STUDYCODE', suffix = 'bl') {
+
+	valueColBl = paste0(valueColumn, suffix);
+	dataBL0 = by(dataN, dataN[[ idColumn ]], function(d0) {
+		Ibaseline = which(d0[[ timeColumn ]] == baselineValue & !is.na(d0[[ timeColumn ]]));
+		if (length(Ibaseline) > 1)
+			warning(Sprintf('Id %{id}s with %{N}d baseline values. Chosing first.', id = d0[[ idColumn ]][1], N = length(Ibaseline)));
+		d1 = if (length(Ibaseline) >= 1) d0[- Ibaseline, , drop = F] else d0;
+		val = if (length(Ibaseline) >= 1) d0[[ valueColumn ]][ Ibaseline[1] ] else NA;
+		if (nrow(d1) == 0) {
+			return(NULL);
+		}
+		d = Df(baselineVar.. = val, d1, headerMap = list(baselineVar.. = valueColBl));
+		return(d);
+	});
+	dataBL = Df_(do.call(rbind, dataBL0));
+	return(dataBL);
+}
