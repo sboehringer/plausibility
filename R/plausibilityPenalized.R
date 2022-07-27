@@ -18,10 +18,10 @@ foldIds = function(N, Nfolds, doSample = TRUE) {
 #lambdaKey %in% c('lambda.min', 'lambda.1se')
 
 lambdaAlphaSelect = function(X, y, lp0, model, NlambdaSel, nfolds, lambdaKey, alphaSel) {
-	foldids = sapply(1:NlambdaSel, function(.) foldIds(nrow(X), nfolds));
+	foldids = sapply(1:NlambdaSel, \(.) foldIds(nrow(X), nfolds));
 	ns = c('lambda', 'mse');
 	lambdaAlpha = lapply(alphaSel, function(alpha) {
-		lambdas = lapply(1:NlambdaSel, function(i) {
+		lambdas = lapply(1:NlambdaSel, \(i) {
 			rGlmnet = cv.glmnet(X, y, offset = lp0, family = model@family,
 				alpha = alpha, foldids = foldids[, i], standardize = FALSE);
 			SetNames(c(rGlmnet[[lambdaKey]], mean(rGlmnet$cvm)), ns)
@@ -31,7 +31,7 @@ lambdaAlphaSelect = function(X, y, lp0, model, NlambdaSel, nfolds, lambdaKey, al
 	alm = aperm(array(unlist(lambdaAlpha), c(2, NlambdaSel, length(alphaSel))), c(2, 1, 3));
 	dimnames(alm) = list(NULL, ns, alphaSel);
 	# select lambda
-	lambdas = apply(alm, 3, function(m)m[which.min((m[, 'lambda'] - median(m[, 'lambda']))^2), , drop = F]);
+	lambdas = apply(alm, 3, \(m)m[which.min((m[, 'lambda'] - median(m[, 'lambda']))^2), , drop = F]);
 	dimnames(lambdas)[[1]] = ns;
 	# alpha + lambda
 	Ialpha = which.min(lambdas['mse', ]);
