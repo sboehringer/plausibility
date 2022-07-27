@@ -33,7 +33,7 @@ contour2shape = function(ct) Polygon(closePathAppend(ct[, c('x', 'y'), drop = F]
 
 polygonFromCoords = function(coords, id)Polygons(list(Polygon(coords)), as.character(id))
 polygonsFromCoords = function(coordsList)
-	SpatialPolygons(ilapply(coordsList, \(coords, i)polygonFromCoords(coords, i)));
+	SpatialPolygons(ilapply(coordsList, function(coords, i)polygonFromCoords(coords, i)));
 
 
 
