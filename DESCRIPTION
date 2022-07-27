@@ -9,6 +9,8 @@ Description: R-package to implement important methods of the plausibility framew
 License: LGPL
 Encoding: UTF-8
 Depends: 
+    sp,
+    maptools
 Collate: 
     plausibilityBase.R
     plausibilityRegion.R
@@ -26,5 +28,4 @@ Collate:
     Rstatistic.R
     plausibility.R
 Suggests: 
-    maptools
 RoxygenNote: 7.1.2
