@@ -98,3 +98,28 @@ setMethod("plausFit", 'plausibilityModelBinomial', function(this, y, mm, offset)
 	}
 	callNextMethod(this, y, mm, offset);
 });
+
+#
+#	<p> negative binomial
+#
+
+setClass('plausibilityModelNegativeBinomial', contains = 'plausibilityModel', representation = list(
+	eps = 'numeric'
+), prototype = list(eps = 1e-4));
+
+
+setMethod('initialize', 'plausibilityModelNegativeBinomial', function(.Object) {
+	.Object = callNextMethod(.Object, family);
+	return(.Object);
+});
+setMethod("plausBounder", 'plausibilityModelNegativeBinomial', function(this, lp) {
+	mus = log(lp);
+	lp[mus < 0] = this@eps;	# help optimizer
+	return(lp);
+})
+
+setMethod("plausSample", 'plausibilityModelNegativeBinomial', function(this, u, lp, parAncil)
+	{ qnbinom(u, size = parAncil, mu = log(lp)) })
+setMethod("plausDensityS", 'plausibilityModelNegativeBinomial', function(this, x, lp, parAncil) {
+	dnbinom(x, parAncil, mu = log(lp), log = TRUE)
+})

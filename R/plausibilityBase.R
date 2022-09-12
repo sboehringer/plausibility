@@ -200,25 +200,31 @@ PlausibilityWeighted = function(f0, f1 = NULL, data, family,
 #
 
 setMethod('region', 'plausibilityFamily',
-	function(this, start = NULL, level = .95, Napprox = 20, ..., Nretries = 2, deltaFact = 3) {
+	function(this, start = NULL, level = .95, Napprox = 20, ..., Nretries = 2, sigmaScale = 3, simplify = TRUE) {
 
 	# search aroudn 3 SDs for a level of .95
 	# <i> calibrate to level
 	mn = if (is.null(start)) this@mdl0$par else start;
-	delta = deltaFact * this@mdl0$sds
+	delta = sigmaScale * this@mdl0$sds
+	r = NA;
 	for (i in 1:Nretries) {
 		ranges = apply(cbind(mn - delta, mn + delta), 1, identity, simplify =- F);	# list fo ranges
 
 		# 	cls = contourLinesStacked(ranges, Napprox, this@objectiveFunction);
 		# 	contour = completeLevelSets(cls, contour = 1 - level);
 		contour = try(FindRegion(this@objectiveFunction, ranges, level = level, Nout = Napprox, this = this));
-		if (!any(class(contour) == 'try-error')) return(list(region = contour));
-		delta = delta * deltaFact;
+		nr = lapply(contour, \(.)nrow(.@polygons[[1]]@Polygons[[1]]@coords));
+		if (!any(unlist(sapply(contour, class)) == 'try-error') && all(nr > 1)) {
+			r = contour;
+			break;
+		}
+		delta = delta * sigmaScale;
 	}
-	return(list(region = NA));
+	if (simplify && length(level) == 1 && !is.na(r)) r = r[[1]];
+	return(list(region = r));
 });
 
-PlausibilityRegionFull = function(f0, data, family = 'gaussian', level = .95, Nsi = 1e3L, Niter = 1L, ..., optMethod = 'grid', plClass = 'plausibilityGlm', initArgs = list()) {
+PlausibilityRegionFull = function(f0, data, family = 'gaussian', level = .95, Nsi = 1e3L, Niter = 1L, Napprox = 20L, ..., optMethod = 'grid', plClass = 'plausibilityGlm', initArgs = list(), sigmaScale = 3) {
 	modelNm = Sprintf('plausibilityModel%{family}u');
 	model = new(modelNm, family = family, ...);
 	Data = completeData(f0, data);
@@ -228,7 +234,7 @@ PlausibilityRegionFull = function(f0, data, family = 'gaussian', level = .95, Ns
 		initArgs);
 	pl = do.call('new', c(list(Class = plClass), args));
 
-	plRegion = region(pl, start = NULL, optMethod = optMethod);
+	plRegion = region(pl, start = NULL, Napprox = Napprox, optMethod = optMethod, level = level, sigmaScale = sigmaScale);
 	return(plRegion);
 }
 
@@ -274,12 +280,13 @@ Plausibility = function(f0, f1 = NULL, data, family = 'binomial',
 #'
 #' @export Plausibility
 PlausibilityRegion = function(f0, f1 = NULL, data, family = 'binomial', level = .95,
-	Nsi = 1e3L, Niter = 1L, optMethod = 'optim', ..., plClass = 'plausibilityGlm', initArgs = list()) {
+	Nsi = 1e3L, Niter = 1L, Napprox = 20L, optMethod = 'optim', ..., plClass = 'plausibilityGlm', initArgs = list(),
+	sigmaScale = 3) {
 
 	rPl = if (notE(f1))
-		PlausibilityRegionMarginal(f0, f1, data, family, Nsi, Niter, optMethod, ...,
-			plClass = plClass, initArgs = initArgs) else
-		PlausibilityRegionFull(f0, data, family, level, Nsi, Niter, optMethod = optMethod, ...,
-			plClass = plClass, initArgs = initArgs);
+		PlausibilityRegionMarginal(f0, f1, data, family, Nsi, Niter, Napprox, optMethod, ...,
+			plClass = plClass, initArgs = initArgs, sigmaScale = sigmaScale) else
+		PlausibilityRegionFull(f0, data, family, level, Nsi, Niter, Napprox, optMethod = optMethod, ...,
+			plClass = plClass, initArgs = initArgs, sigmaScale = sigmaScale);
 	return(rPl);
 }

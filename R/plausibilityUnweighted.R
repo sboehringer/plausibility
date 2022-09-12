@@ -12,12 +12,13 @@
 
 glmLL = function(par, X, y, this, offset = 0) plausDensity(this, y,  (X %*% par)[, 1] + offset);
 glmModelOptimize = function(X, y, this, offset) {
-	start = rep(0, length(this@par));
+	start = rep(0, ncol(X));
 	o = try(
 		optim(start, glmLL, method = 'BFGS', control = list(fnscale = -1),
 			X = X, y = y, this = this, offset = offset)
 	, silent = T);
-	if (class(o) == 'try-error') browser();
+	#if (class(o) == 'try-error') browser();
+	if (class(o) == 'try-error') return(list(par = rep(NA, ncol(X)), ll = -Inf));
 	return(list(par = o$par, ll = o$value))
 }
 glmModel = function(X, y, this, offset = 0) {

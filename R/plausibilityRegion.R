@@ -35,8 +35,6 @@ polygonFromCoords = function(coords, id)Polygons(list(Polygon(coords)), as.chara
 polygonsFromCoords = function(coordsList)
 	SpatialPolygons(ilapply(coordsList, \(coords, i)polygonFromCoords(coords, i)));
 
-
-
 PolyUnion = function(plgs) {
 	poly = plgs[[1]];
 	for (p in  plgs[-1]) poly = gUnion(poly, p);
@@ -110,7 +108,8 @@ closePath = function(nodes) {
 }
 
 completedLevelSet = function(cl, contour, Nround = 4) {
-	lvlsI = which(round(list.kpu(cl, 'level'), Nround) == round(contour, Nround));
+	lvlsI = which.max(round(list.kpu(cl, 'level') - contour, Nround) >= 0);
+	print(list(levels = round(list.kpu(cl, 'level'), Nround), I = lvlsI));
 	nodeList = lapply(lvlsI, function(i)Df(x = cl[[i]]$x, y = cl[[i]]$y));
 	print(list(completedLevelSet_nodeList = nodeList));
 	return(closePath(nodeList));
@@ -138,7 +137,7 @@ array2vectorWrapper = function(x, y, myFun, coordsFixed = NULL, coordsIdcs = NUL
 		myFun(p, ...)
 	})
 }
-contour2DforFixed = function(fixedCoords, fn, seqs, free, fixedIdcs, nlevels = 20, ..., Nround = 4) {
+contour2DforFixed = function(fixedCoords, fn, seqs, free, fixedIdcs, nlevels, ..., Nround = 4) {
 	x = seqs[[free[1]]];
 	y = seqs[[free[2]]];
 	z = outer(x, y, array2vectorWrapper, myFun = fn, coordsFixed = fixedCoords, coordsIdcs = fixedIdcs, ...);
@@ -146,7 +145,7 @@ contour2DforFixed = function(fixedCoords, fn, seqs, free, fixedIdcs, nlevels = 2
 	return(cl);
 }
 
-contourLinesStacked = function(ranges, N, fn, free, nlevels = 20, ...) {
+contourLinesStacked = function(ranges, N, fn, free, nlevels = 40, ...) {
 	seqs = lapply(ranges, function(r)seq(r[1], r[2], length.out = N));
 	if (missing(free)) free = c(length(ranges) - 1, length(ranges));
 	fixed = setdiff(1:length(ranges), free);
@@ -162,7 +161,7 @@ contourLinesStacked = function(ranges, N, fn, free, nlevels = 20, ...) {
 FindRegion = function(f, range, level = .95, Nout = 20, ...) {
 	Nargs = length(range);
 	cls = contourLinesStacked(range, Nout, f, ...);
-	contour = completeLevelSets(cls, contour = 1 - level);
+	contour = SetNames(lapply(level, \(level)completeLevelSets(cls, contour = 1 - level)), level);
 	return(contour);
 }
 

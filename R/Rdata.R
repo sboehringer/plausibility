@@ -2285,16 +2285,16 @@ MC = function(m) {
 
 # like table but produce columns for all numbers 1..n (not only for counts > 0)
 # cats are the expected categories
-table.n = function(v, n, min = 1, categories = NULL) {
+table.n = function(v, n, min = 1, categories = NULL, useNA = 'no') {
 	if (is.null(categories)) categories = min:n;
-	t = as.vector(table(c(categories, v)) - rep(1, length(categories)));
+	t = as.vector(table(c(categories, v), useNA = useNA) - rep(1, length(categories)));
 	t
 }
 
 tableFreqMarg = function(tab, margin = 2)apply(as.matrix(tab), margin, vn)
 
-table.freq = function(v, byCol = TRUE) {
-	t0 = table(v);
+table.freq = function(v, byCol = TRUE, useNA = 'no') {
+	t0 = table(v, useNA = useNA);
 	r = if (is.vector(v) || is.factor(v) || is.numeric(v) || ncol(v) == 1) { t0 / sum(t0) } else {
 		if (byCol) tableFreqMarg(t0) else tableFreqMarg(t0, 1)
 	}
@@ -2336,6 +2336,14 @@ Table = function(v, min, max, ..., cats, asDf = FALSE, perc = FALSE, total = FAL
 TableDf = function(v, min, max, ..., cats, asDf = TRUE, perc = FALSE, total = FALSE)
 	Table(v, min, max, ..., cats = cats, asDf = asDf, perc = perc, total = total);
 v2freq = function(v)(v/sum(v))
+
+TableReshaped = function(df, reshape = names(df), replace = list(Freq. = '')) {
+	tab = table(df)
+	tabReshaped = reshape.wide(Df_(tab), reshape[1], reshape[-1]);
+	if (notE(replace)) names(tabReshaped) = vector.replace(names(tabReshaped), list(Freq. = ''), regex = T);
+	return(tabReshaped);
+}
+
 
 #
 #	<p> numeric function

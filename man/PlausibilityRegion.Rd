@@ -12,10 +12,12 @@ PlausibilityRegion(
   level = 0.95,
   Nsi = 1000L,
   Niter = 1L,
+  Napprox = 20L,
   optMethod = "optim",
   ...,
   plClass = "plausibilityGlm",
-  initArgs = list()
+  initArgs = list(),
+  sigmaScale = 3
 )
 }
 \arguments{
