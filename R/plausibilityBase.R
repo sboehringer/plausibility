@@ -167,10 +167,12 @@ PlausibilityUnweighted = function(f0, data, family,
 
 plClasses = list(
 	binomial = 'plausibilityGlmWeighted',
+	negativeBinomial = 'plausibilityGlmWeighted',
 	gaussian = 'plausibilityGlmWeightedGaussian'
 );
 plFudgFactors = list(
 	binomial = 6,
+	negativeBinomial = 6,
 	gaussian = 4,
 	NIbinomial = 1
 );

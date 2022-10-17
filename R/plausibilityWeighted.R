@@ -18,7 +18,7 @@ cumProbSIcomp = function(par, this, dampen = logAtOff) {
 	# help optimizer, if necessary (e.g. bound away form 0, 1), defaults to identity
 	lp = plausBounder(this@model, lp);
 	parAncil = plausAncil(this@model, this@y, lp)
-	TsRaw = apply(this@sim, 2, function(y)plausDensity(this@model, y, lp, parAncil));
+	TsRaw = apply(this@sim, 2, function(y)plausDensity(this@model, y, lp, parAncil, par));
 	# importance sampling correction
 	TsIS0 = TsRaw - this@pSI;
 	Ts = dampen( TsIS0 );	# dampen weighing
@@ -58,7 +58,8 @@ weightingFunctionLR = function(model, y, mm0, mm1) {
 	#return(-2*( m1$ll - m0$ll ));
 	# <!> 28.6.2021 changed to integrate the tail to achieve more stable P-values,
 	#	dispense with factor 2
-	return( m1$ll - m0$ll );
+	lr =  m1$ll - m0$ll;
+	return( max(lr, 0) );
 }
 
 fudgeLp = function(model, mm1, this, scale = 100, fudge = NULL) {
@@ -106,10 +107,12 @@ setMethod('initialize', 'plausibilityGlmWeighted', function(.Object, f0, f1, dat
 	# <p> stochastic integration sample	# plausSample(.Object, ., lp) %.% .
 	if (is.null(sim))
 		sim = apply(matrix(runif(length(lp) * Nsi), ncol = Nsi), 2, function(u)
-			plausSample(model, u, lp, parAncil));
+			# <i> sampleFromAt && negBinomial
+			plausSample(model, u, lp, parAncil, .Object@mdl0$par));
 
 	# <p> simulation weights
-	weights = apply(sim, 2, function(r)weightingFunction(model, r, .Object@mm, mm1));
+	#weights = apply(sim, 2, function(r)weightingFunction(model, r, .Object@mm, mm1));
+	weights = unlist(apply(sim, 2, function(r)weightingFunction(model, r, .Object@mm, mm1)));
 	# <p> data weights
 	weight = weightingFunction(model, .Object@y, .Object@mm, mm1);
 
@@ -126,7 +129,7 @@ setMethod('initialize', 'plausibilityGlmWeighted', function(.Object, f0, f1, dat
 	#if (sum(weights >= weight) == Nsi && lr$o[[2]]$par[2] > 0) browser();
 
 	# <p> probabilities stochastic integration sample under starting pars, needed for importance correction
-	.Object@pSI = apply(.Object@sim, 2, function(r)plausDensity(model, r, lp, parAncil));
+	.Object@pSI = apply(.Object@sim, 2, function(r)plausDensity(model, r, lp, parAncil, .Object@mdl0$par));
 	#print(df2LRmatrix(Df(y = .Object@y, x = .Object@mm[, -1])));
 	#print(c(Nweights = sum(weights >= weight), weight = weight, par = .Object@mdl0$par, parAlt = plausFitAlt(model, .Object@y, mm1)$par), lp = c(lp[1:5], lp[201:205]));
 	#print(list(N = sum(weights > weight), ll = .Object@pSI));

@@ -108,9 +108,14 @@ closePath = function(nodes) {
 }
 
 completedLevelSet = function(cl, contour, Nround = 4) {
-	lvlsI = which.max(round(list.kpu(cl, 'level') - contour, Nround) >= 0);
+	# <A> assume ordered levels
+	lvls = round(list.kpu(cl, 'level') - contour, Nround);
+	# lvlsI = which.max(lvls >= 0);
+	lvlsI = max(which.max(lvls >= 0) - 1, 1);
 	print(list(levels = round(list.kpu(cl, 'level'), Nround), I = lvlsI));
 	nodeList = lapply(lvlsI, function(i)Df(x = cl[[i]]$x, y = cl[[i]]$y));
+	#nodeList = list(Df(x = cl[[lvlsI]]$x, y = cl[[lvlsI]]$y));
+	#browser();
 	print(list(completedLevelSet_nodeList = nodeList));
 	return(closePath(nodeList));
 }

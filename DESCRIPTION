@@ -1,8 +1,8 @@
 Package: plausibility
 Type: Package
 Title: Plausibility based estimation and inference
-Version: 0.6-1
-Date: 2022-09-12
+Version: 0.6-2
+Date: 2022-10-17
 Author: Stefan Böhringer <r-packages@s-boehringer.org>
 Maintainer: Stefan Böhringer <r-packages@s-boehringer.org>
 Description: R-package to implement important methods of the plausibility framework, including goodness-of-fit testing, test model comparisons and computation of marginal and joint plausibility regions.

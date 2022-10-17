@@ -7,44 +7,26 @@
 #
 
 #
-#	<p> glm model helper classes
+#	<p> glm model helper classes/functions
 #
 
-glmLL = function(par, X, y, this, offset = 0) plausDensity(this, y,  (X %*% par)[, 1] + offset);
-glmModelOptimize = function(X, y, this, offset) {
-	start = rep(0, ncol(X));
-	o = try(
-		optim(start, glmLL, method = 'BFGS', control = list(fnscale = -1),
-			X = X, y = y, this = this, offset = offset)
-	, silent = T);
-	#if (class(o) == 'try-error') browser();
-	if (class(o) == 'try-error') return(list(par = rep(NA, ncol(X)), ll = -Inf));
-	return(list(par = o$par, ll = o$value))
-}
-glmModel = function(X, y, this, offset = 0) {
-	m = glm(y ~ . + 0, as.data.frame(cbind(X, y)), family = this@family, offset = recycle(offset, y)[[1]]);
-	parAncil = plausAncil(this, y, m$linear.predictors)
-	ll = plausDensity(this, y, m$linear.predictors, parAncil);
-	if (ll == -Inf) return(glmModelOptimize(X, y, this, offset));
-	return(list(par = m$coefficients, ll = ll, sds = sqrt(diag(vcov(m))), model = m));
-}
 
 # bounder@binomial:
 #	function(lp, epsPs = 1e-5) { lp[lp == 1] = 1 - epsPs; return(lp); }
 
 cumProbSI = function(par, this) {
 	N = length(this@y);
-	lp = (this@mm %*% par)[, 1];
+	lp = (this@mm %*% par[1:ncol(this@mm)])[, 1];
 	# help optimizer, if necessary (e.g. bound away form 0, 1), defaults to identity
 	lp = plausBounder(this@model, lp);
 	parAncil = plausAncil(this@model, this@y, lp)
-	TsRaw = apply(this@sim, 2, function(y)plausDensity(this@model, y, lp, parAncil));
+	TsRaw = apply(this@sim, 2, function(y)plausDensity(this@model, y, lp, parAncil, par));
 	# importance sampling, cancel out uniform factor (max)
 	TsIS0 = TsRaw - this@pSI;
 	TsIS = TsIS0 - max(TsIS0);
 
 	# <p> Test statistic + IS correction: reweight events
-	Tdata = plausDensity(this@model, this@y, lp, parAncil);
+	Tdata = plausDensity(this@model, this@y, lp, parAncil, par);
 	#<A> comparison based on ll instead of -ll, keep on this scale for IS correction
 	sel = TsRaw <= Tdata;
 	Ts = TsIS[sel];
@@ -81,17 +63,17 @@ setMethod('initialize', 'plausibilityGlm', function(.Object,
 	.Object@mdl0 = plausFit(model, .Object@y, .Object@mm);
 
 	# <p> linear predictor
-	if (is.null(lp)) lp = (.Object@mm %*% .Object@mdl0$par)[, 1];
+	if (is.null(lp)) lp = (.Object@mm %*% .Object@mdl0$par[1:ncol(.Object@mm)])[, 1];
 	# <p> ancillary parameters
 	parAncil = plausAncil(model, .Object@y, lp);
 	# <p> stochastic integration sample	# plausSample(.Object, ., lp) %.% .
 	if (is.null(sim))
 		sim = apply(matrix(runif(length(lp) * Nsi), ncol = Nsi), 2, function(u)
-			plausSample(model, u, lp, parAncil));
+			plausSample(model, u, lp, parAncil, .Object@mdl0$par));
 	.Object@sim = sim;
 
 	# <p> probabilities stochastic integration sample under starting pars, needed for importance correction
-	.Object@pSI = apply(sim, 2, function(r)plausDensity(model, r, lp, parAncil));
+	.Object@pSI = apply(sim, 2, function(r)plausDensity(model, r, lp, parAncil, .Object@mdl0$par));
 	return(.Object);
 });
 
