@@ -106,30 +106,40 @@ closePath = function(nodes) {
 	#print(list(closePath_path = path));
 	return(path);
 }
+pathCheckClosed = function(nodes) {
+	if (length(nodes) == 0) return(TRUE);
+	return(all(sapply(nodes, pathIsClosed)));
+}
 
+
+# <i> rather raise exception/return NA than completing level-set
 completedLevelSet = function(cl, contour, Nround = 4) {
 	# <A> assume ordered levels
 	lvls = round(list.kpu(cl, 'level') - contour, Nround);
 	# lvlsI = which.max(lvls >= 0);
 	lvlsI = max(which.max(lvls >= 0) - 1, 1);
 	print(list(levels = round(list.kpu(cl, 'level'), Nround), I = lvlsI));
-	nodeList = lapply(lvlsI, function(i)Df(x = cl[[i]]$x, y = cl[[i]]$y));
-	#nodeList = list(Df(x = cl[[lvlsI]]$x, y = cl[[lvlsI]]$y));
-	#browser();
+	#nodeList = lapply(lvlsI, function(i)Df(x = cl[[i]]$x, y = cl[[i]]$y));
+	#nodeList = SetNames(list(Df(x = cl[[lvlsI]]$x, y = cl[[lvlsI]]$y)), 1 - contour);
+	nodeList = SetNames(list(Df_(cl[[lvlsI]][c('x', 'y')])), 1 - contour);
 	print(list(completedLevelSet_nodeList = nodeList));
-	return(closePath(nodeList));
+	# <A> don't close anymore, return NA on non-closed pathes
+	#return(closePath(nodeList));
+	if (!pathCheckClosed(nodeList)) stop('contour of plausibility region non-closed');
+	return(nodeList);
 }
 
-length0.omit = function(l)filterList(l, function(e)length(e) > 0)
+nullFilter = function(.)length(.) > 0
+length0.omit = function(l)filterList(l, nullFilter)
 
 completeLevelSets = function(cts, contour = 40) {
 	cts = length0.omit(unlist.n(lapply(cts, completedLevelSet, contour = contour), 1));
-	contour = polygonsFromCoords(cts);
+	r = polygonsFromCoords(cts);
 # 	splgs = SpatialPolygons(list(Polygons(plgs, ID = 'contour')));
 # 	contourP = unionSpatialPolygons(splgs, 'contour');
-# 	#contour = contourP@polygons[[1]]@Polygons[[1]]@coords;
-# 	contour = contourP@polygons[[1]]@Polygons[[1]];
-	return(contour);
+# 	#r = contourP@polygons[[1]]@Polygons[[1]]@coords;
+# 	r = contourP@polygons[[1]]@Polygons[[1]];
+	return(r);
 }
 
 array2vectorWrapper = function(x, y, myFun, coordsFixed = NULL, coordsIdcs = NULL, ...) {
@@ -163,10 +173,39 @@ contourLinesStacked = function(ranges, N, fn, free, nlevels = 40, ...) {
 	return(cls);
 }
 
-FindRegion = function(f, range, level = .95, Nout = 20, ...) {
+calibrateLinear2x2 = function(v, m) {
+	(v - m[2, 1])/(m[1, 1] - m[2, 1]) * (m[1, 2] - m[2, 2]) + m[2, 2]
+}
+
+# calibrate value v by mapptng v through linear functions defined by calMat
+calibrateLinear = Vectorize(function(level, calSpec, N) {
+	if (N < calSpec$N[1] || N > calSpec$N[2]) return(level);
+	m = calSpec$map;
+	Nm = which.min(level < c(m[, 1], FALSE));
+	# out of range
+	if (Nm > nrow(m) || (Nm == 1 && level > m[Nm, 1])) return(level);
+	# nothing to interpolate (special case of Nm == nrow(m)
+	if (level == m[Nm, 1]) return(m[Nm, 2]);
+	return(calibrateLinear2x2(level, m[c(Nm - 1, Nm), ]));
+}, 'level');
+
+V2Mr = function(v, ncol = 2)matrix(v, ncol = ncol, byrow = TRUE)
+RegionLevelCalibration = list(
+	std = list(N = c(1, 100), map = V2Mr(c(.99, .999, .97, .99, .95, .98, .9, .93)))
+)
+FindRegion = function(f, range, level = .95, Nout = 20, this, ..., calibration = 'std') {
+	if (notE(calibration)) {
+		levelO = level;
+		if (is.character(calibration)) calibration = RegionLevelCalibration[[calibration]];
+		level = calibrateLinear(level, calibration, nrow(this@mm));
+		print(list2df(list(level = level, levelO = levelO)))
+	}
 	Nargs = length(range);
-	cls = contourLinesStacked(range, Nout, f, ...);
-	contour = SetNames(lapply(level, \(level)completeLevelSets(cls, contour = 1 - level)), level);
+	cls = contourLinesStacked(range, Nout, f, this = this, ...);
+	contour = try(
+		SetNames(lapply(level, \(level)completeLevelSets(cls, contour = 1 - level)), level)
+	);
+	if (any(class(contour) == 'try-error')) return(NA);
 	return(contour);
 }
 

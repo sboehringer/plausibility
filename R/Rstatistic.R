@@ -1986,12 +1986,13 @@ SummaryCatCol = function(col) {
 }
 
 SummaryCol = function(col, qtls = c(0, 0.25, .5, .75, 1)) {
-	r = if (class(col) == 'numeric') SummaryColNum(col, qtls) else
+	r = if (class(col) %in% c('numeric', 'integer')) SummaryColNum(col, qtls) else
 		if (class(col) == 'factor') SummaryCatCol(col) else
 			stop("Could not summarize column");
 	r
 }
 
+# attach attribute label as column name to all columns
 DfLabel = function(d) {
 	return(Df(nelapply(d, function(n, col) {
 		attr(col, 'label') = n;
@@ -2004,7 +2005,6 @@ Summary = function(d) {
 	r1 = RbindDfs(SetNames(r0, NULL), embed = TRUE);
 	return(r1);
 }
-
 
 # summary of categorical data
 SummaryCat = function(d) {
@@ -2045,7 +2045,7 @@ SummaryBy = function(d, By, summaryVars) {
 	tests = lapply(summaryVars, function(n)SummaryTest(d[[n]], d[[By]]));
 	dfTests = do.call(rbind, tests);
 	tab = do.call(cbind, r);
-	tabTests = MergeByRowNanmes(tab, dfTests, all = TRUE);
+	tabTests = MergeByRowNames(tab, dfTests, all = TRUE);
 	return(list(tab = tab, tabsBy = r, tabTests = tabTests, test = dfTests));
 }
 

@@ -579,14 +579,17 @@ SystemS = function(cmd, logLevel = get('DefaultLogLevel', envir = Log_env__),
 	System(cmd, logLevel, doLog, printOnly, return.output, return.cmd = return.cmd);
 }
 
+qsub_wait_function = function(r, ...) {
+	ids = if (is.list(r[[1]]) & !is.null(r[[1]]$jid)) list.kp(r, 'jid', do.unlist = TRUE) else r$jid;
+	idsS = if (length(ids) == 0) '' else paste(ids, collapse = ' ');
+	System(sprintf('qwait.pl %s', idsS), ...);
+}
+	
 # wait on job submitted by system
 .System.wait.patterns = list(
 	default = function(r, ...)(NULL),
-	qsub = function(r, ...) {
-		ids = if (is.list(r[[1]]) & !is.null(r[[1]]$jid)) list.kp(r, 'jid', do.unlist = TRUE) else r$jid;
-		idsS = if (length(ids) == 0) '' else paste(ids, collapse = ' ');
-		System(sprintf('qwait.pl %s', idsS), ...);
-	}
+	qsub = qsub_wait_function,
+	qsub_slurm = qsub_wait_function
 );
 System.wait = function(rsystem, pattern = NULL, ...) {
 	r = if (!is.null(pattern)) .System.wait.patterns[[pattern]](rsystem, ...) else NULL;
@@ -812,10 +815,27 @@ stdOutFromCall = function(call_) {
 # 	md5
 # }
 # same as above, less dpendencies
-md5sumString = function(s, ...)substr(SystemS('echo -n %{s}q | md5sum', return.output = TRUE)$output, 1, 32)
-sha256sumString = function(s, ...)substr(SystemS('echo -n %{s}q | sha256sum', return.output = TRUE)$output, 1, 32)
-sha256sumPath = function(path, ...)substr(SystemS('sha256sum %{path}q', return.output = TRUE)$output, 1, 64)
+md5sumString = function(s, length = 32, ..., logLevel = 5)
+	substr(
+		SystemS('echo -n %{s}q | md5sum', return.output = TRUE, logLevel = logLevel)$output
+	, 1, min(length, 32))
+sha256sumString = function(s, length = 32, ..., logLevel = 5)
+	substr(
+		SystemS('echo -n %{s}q | sha256sum', return.output = TRUE, logLevel = logLevel)$output
+	, 1, min(length, 64))
+sha256sumPath = function(path, length = 64, ..., logLevel = 5)
+	substr(
+		SystemS('sha256sum %{path}q', return.output = TRUE, logLevel = logLevel)$output
+	, 1, min(length, 64))
 
+hashPathContent = function(path, type = 'sha256', length = 64,..., logLevel = 5) {
+	f = get(paste0(type, 'sumPath'));
+	f(path, length, ..., logLevel = logLevel)
+}
+hashStringContent = function(path, type = 'sha256', length = 64,..., logLevel = 5) {
+	f = get(paste0(type, 'sumString'));
+	f(path, length, ..., logLevel = logLevel)
+}
 
 #
 #	<p> package documentation
@@ -958,6 +978,7 @@ createZip = function(input, output, pword, doCopy = FALSE, readmeText, readme, l
 	absoluteSymlink = FALSE, simplifyFileNames = FALSE, folderString = '::') {
 	destDir = splitPath(output)$fullbase;
 	Dir.create(destDir);
+	if (!missing(readmeText)) writeFile(Sprintf('%{destDir}s/README'), readmeText);
 	nelapply(input, function(n, e) {
 		if (notE(folderString)) n = gsub(folderString, '/', n);
 		subdir = join(c(destDir, n, ''), '/');
